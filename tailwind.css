@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@layer theme {
+  :root {
+        --background: rgba(255, 255, 255, 1);
+    --foreground: rgba(37, 37, 37, 1);
+    --card: rgba(255, 255, 255, 1);
+    --card-foreground: rgba(37, 37, 37, 1);
+    --popover: rgba(255, 255, 255, 1);
+    --popover-foreground: rgba(37, 37, 37, 1);
+    --primary: rgba(52, 52, 52, 1);
+    --primary-foreground: rgba(251, 251, 251, 1);
+    --secondary: rgba(247, 247, 247, 1);
+    --secondary-foreground: rgba(52, 52, 52, 1);
+    --muted: rgba(247, 247, 247, 1);
+    --muted-foreground: rgba(142, 142, 142, 1);
+    --accent: rgba(247, 247, 247, 1);
+    --accent-foreground: rgba(52, 52, 52, 1);
+    --destructive: rgba(220, 50, 50, 1);
+    --border: rgba(235, 235, 235, 1);
+    --input: rgba(235, 235, 235, 1);
+    --ring: rgba(180, 180, 180, 1);
+    --chart-1: rgba(255, 140, 80, 1);
+    --chart-2: rgba(80, 180, 200, 1);
+    --chart-3: rgba(80, 120, 180, 1);
+    --chart-4: rgba(255, 200, 120, 1);
+    --chart-5: rgba(255, 180, 100, 1);
+    --sidebar: rgba(251, 251, 251, 1);
+    --sidebar-foreground: rgba(37, 37, 37, 1);
+    --sidebar-primary: rgba(52, 52, 52, 1);
+    --sidebar-primary-foreground: rgba(251, 251, 251, 1);
+    --sidebar-accent: rgba(247, 247, 247, 1);
+    --sidebar-accent-foreground: rgba(52, 52, 52, 1);
+    --sidebar-border: rgba(235, 235, 235, 1);
+    --sidebar-ring: rgba(180, 180, 180, 1);
+
+  }
+
+  body:has(main.dark) {
+
+    --background: rgba(18, 20, 24, 1);
+    --foreground: rgba(255, 255, 255, 1);
+    --card: rgba(18, 20, 24, 1);
+    --card-foreground: rgba(182, 182, 182, 1);
+    --popover: rgba(20, 22, 28, 1);
+    --popover-foreground: rgba(255, 255, 255, 1);
+    --primary: rgba(140, 170, 110, 1);
+    --primary-foreground: rgba(255, 255, 255, 1);
+    --secondary: rgba(98, 98, 98, 1);
+    --secondary-foreground: rgba(255, 255, 255, 1);
+    --muted: rgba(18, 20, 24, 1);
+    --muted-foreground: rgba(222, 222, 222, 1);
+    --accent: rgba(40, 42, 48, 1);
+    --accent-foreground: rgba(255, 255, 255, 1);
+    --destructive: rgba(180, 60, 60, 1);
+    --border: rgba(95, 95, 95, 1);
+    --input: rgba(20, 22, 28, 1);
+    --ring: rgba(140, 170, 110, 1);
+    --chart-1: rgba(120, 140, 200, 1);
+    --chart-2: rgba(230, 255, 200, 1);
+    --chart-3: rgba(140, 170, 110, 1);
+    --chart-4: rgba(138, 138, 138, 1);
+    --chart-5: rgba(230, 120, 110, 1);
+    --sidebar: rgba(18, 20, 24, 1);
+    --sidebar-foreground: rgba(182, 182, 182, 1);
+    --sidebar-primary: rgba(220, 100, 100, 1);
+    --sidebar-primary-foreground: rgba(255, 255, 255, 1);
+    --sidebar-accent: rgba(40, 42, 48, 1);
+    --sidebar-accent-foreground: rgba(255, 255, 255, 1);
+    --sidebar-border: rgba(230, 120, 110, 0);
+    --sidebar-ring: rgba(140, 140, 140, 0.51);
+  }
+
+  @theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    --font-sans: var(--font-sans);
+    --font-mono: var(--font-mono);
+    --font-serif: var(--font-serif);
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+  }
+}
