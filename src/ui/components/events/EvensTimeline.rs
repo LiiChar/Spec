@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Datelike, Local, NaiveDate, Timelike, Utc};
 use dioxus::{html::label::form, prelude::*};
 
-use crate::{core::EventModel, lib::convert_ts_to_local_date, ui::{EventElement, EventsList}};
+use crate::{core::EventModel, lib::{convert_ts_to_local_date, get_process_color}, ui::{EventElement, EventsList}};
 
 #[derive(PartialEq, Clone)]
 pub enum TimelineOrientation {
@@ -49,6 +49,16 @@ fn group_by_hours(
     result
 }
 
+/// Получить уникальные процессы для легенды
+fn get_unique_processes(events: &[EventModel]) -> Vec<String> {
+    let mut processes: Vec<String> = events
+        .iter()
+        .map(|e| e.window.process_name.clone())
+        .collect();
+    processes.sort();
+    processes.dedup();
+    processes
+}
 
 #[component]
 pub fn EventsTimeline(props: EventsCalendarProps) -> Element {
@@ -60,25 +70,30 @@ pub fn EventsTimeline(props: EventsCalendarProps) -> Element {
 
     rsx! {
         div {
-            class: format!("flex flex-col gap-0.5 w-full h-full items-center relative  {}", match props.orientation {
-                TimelineOrientation::Horizontal => "flex-row",
-                TimelineOrientation::Vertical => "flex-col"
-            }),
-            if selected_hour.read().is_some() {
-              div {
-                class: "absolute inset-0 bg-blue-500/30 rounded-sm",
-                
-              }
-            },
-            {(1..=24).map(|hour| {
+            class: format!("flex flex-col gap-0.5 w-full h-full items-stretch relative transition-all duration-300 {}", 
+                match props.orientation {
+                    TimelineOrientation::Horizontal => "flex-row",
+                    TimelineOrientation::Vertical => "flex-col"
+                }
+            ),
+            
+            {(0..24).map(|hour| {
                 let empty: Vec<EventModel> = Vec::new();
 
                 let events = day_data
                     .and_then(|h| h.get(&hour))
                     .unwrap_or(&empty);
-                  
+                    
                 rsx! {
-                  EventElement {}
+                    EventElement { 
+                    class: "min-h-[100px] current-hour",
+                        events: events.clone(), 
+                        hour, 
+                        orientation: props.orientation.clone(), 
+                        onclick: Some(EventHandler::new(move |_| {
+                            selected_hour.set(Some(hour));
+                        })) 
+                    }
                 }
             })}
         }

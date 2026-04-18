@@ -1,5 +1,5 @@
 pub mod Events;
-pub mod Info;
+pub mod EventInfo;
 
 pub use Events::*;
-pub use Info::*;
+pub use EventInfo::*;

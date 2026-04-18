@@ -1,10 +1,12 @@
 mod core;
 mod ui;
 mod lib;
+mod config;
 
 use core::*;
 use ui::*;
 use lib::*;
+use config::*;
 
 use std::{sync::{Arc, Mutex}, thread};
 
@@ -30,6 +32,25 @@ fn main() {
 
     thread::spawn(move || {
         core::tracker::start_tracking(tx);
+    });
+
+    thread::spawn(move || {
+        let database = WindowsDatabase::new(DATABASE_PATH);
+
+        println!("Database path: {}", DATABASE_PATH);
+
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+
+            if let Ok(rx_guard) = RX.lock() {
+                if let Some(rx) = rx_guard.as_ref() {
+                    while let Ok(event) = rx.try_recv() {
+                        print!("{:?}", event.window.title);
+                        database.insert_event(&event).expect("Failed insert event");
+                    }
+                }
+            }
+        }
     });
 
     dioxus::LaunchBuilder::desktop()

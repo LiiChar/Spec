@@ -5,10 +5,15 @@ use crate::ui::Header;
 #[component]
 pub fn Layout(children: Element) -> Element {
     rsx! {
-        Header {},
-        main {
-          class: "mt-[10px] dark",
-          {children}
+        div {
+            class: "flex flex-col w-full h-full",
+            
+            Header {},
+            
+            main {
+                class: "mt-[16px] flex-1 dark",
+                {children}
+            }
         }
     }
 }
