@@ -33,7 +33,7 @@
     --sidebar-accent-foreground: rgba(52, 52, 52, 1);
     --sidebar-border: rgba(235, 235, 235, 1);
     --sidebar-ring: rgba(180, 180, 180, 1);
-
+    --radius: 0.625rem;
   }
 
   body:has(main.dark) {

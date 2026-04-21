@@ -4890,6 +4890,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "dioxus",
+ "dioxus-signals",
  "image",
  "once_cell",
  "rusqlite",

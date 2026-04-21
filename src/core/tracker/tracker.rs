@@ -1,116 +1,121 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use std::thread;
 
-use chrono::DateTime;
 use crossbeam_channel::Sender;
-use windows::Win32::Foundation::*;
-use windows::Win32::UI::WindowsAndMessaging::*;
-use windows::Win32::System::Threading::*;
-use windows::Win32::UI::Accessibility::*;
 use windows::Win32::System::SystemInformation::GetTickCount;
-use windows::Win32::UI::Input::KeyboardAndMouse::*;
+use windows::Win32::UI::Input::KeyboardAndMouse::GetLastInputInfo;
+use windows::Win32::UI::Input::KeyboardAndMouse::LASTINPUTINFO;
 
 use crate::core::{EventModel, EventType, WindowModel, get_current_window};
 use crate::lib::current_ts;
 
-static mut TRACKER: Option<Mutex<Tracker>> = None;
-static mut HOOK: Option<HWINEVENTHOOK> = None;
-static mut RUNNING: bool = false;
-static mut EVENT_TX: Option<Sender<EventModel>> = None;
+const IDLE_THRESHOLD_SECS: u32 = 60;
+const MIN_EVENT_DURATION_MS: u128 = 250;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Activity {
+    window: Option<WindowModel>,
+    idle: bool,
+}
+
+impl Activity {
+    fn event_type(&self) -> EventType {
+        if self.idle {
+            EventType::Idle
+        } else {
+            EventType::WindowSwitch
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Tracker {
-    pub current_app: Option<WindowModel>,
-    pub start_time: Instant,
-    pub stats: HashMap<WindowModel, Duration>,
+    current: Option<Activity>,
+    start_time: Instant,
+    report_interval: Duration,
+    pub stats: HashMap<String, Duration>,
 }
 
 impl Tracker {
-    fn new() -> Self {
+    pub fn new(report_interval: Duration) -> Self {
         Self {
-            current_app: None,
+            current: None,
             start_time: Instant::now(),
+            report_interval,
             stats: HashMap::new(),
         }
     }
 
-    fn switch_app(&mut self, app: WindowModel) {
+    pub fn tick(&mut self, tx: &Sender<EventModel>) {
         let now = Instant::now();
 
-        if let Some(current) = &self.current_app {
+        if let Some(current) = &self.current {
             let duration = now - self.start_time;
-            *self.stats.entry(current.clone()).or_default() += duration;
-
-            println!("Switched from {} after {:?}", current.title, duration);
+            if duration >= self.report_interval {
+                self.send_event(current, duration, tx);
+                self.start_time = now;
+            }
         }
-
-        self.current_app = Some(app.clone());
-        self.start_time = now;
-
-        println!("Now active: {:?}", app);
     }
 
-    fn stop(&mut self) {
-        println!("Tracker stopped. Finalizing state...");
-        self.current_app = None;
-    }
-}
-
-unsafe extern "system" fn win_event_proc(
-    _hook: HWINEVENTHOOK,
-    event: u32,
-    hwnd: HWND,
-    _id_object: i32,
-    _id_child: i32,
-    _event_thread: u32,
-    _event_time: u32,
-) {
-    if event != EVENT_SYSTEM_FOREGROUND {
-        return;
-    }
-
-    let win = match get_current_window(Some(hwnd)) {
-        Some(w) => w,
-        None => return
-    };
-
-    if let Some(tracker) = &TRACKER {
-        let mut tracker = tracker.lock().unwrap();
-
-        if is_user_idle(60) {
-            // не считаем idle
-            tracker.current_app = None;
+    fn send_event(&self, activity: &Activity, duration: Duration, tx: &Sender<EventModel>) {
+        if duration.as_millis() < MIN_EVENT_DURATION_MS {
             return;
         }
 
-        if let Some(tx) = &EVENT_TX {
-            let now = Instant::now();
+        let _ = tx.send(EventModel {
+            window: activity.window.clone(),
+            event_type: activity.event_type(),
+            timestamp: current_ts() - duration.as_millis() as u64,
+            duration: duration.as_millis() as u64,
+        });
+    }
 
-            let duration = now
-                .duration_since(tracker.start_time)
-                .as_millis() as u64;
+    fn switch(&mut self, next: Activity, tx: &Sender<EventModel>) {
+        let now = Instant::now();
 
-            if (duration as f64 / 1000.0) < 1.0 {
-                return
+        if let Some(current) = &self.current {
+            let duration = now - self.start_time;
+
+            if duration.as_millis() > 0 {
+                let key = self.key(current);
+                *self.stats.entry(key).or_default() += duration;
+                self.send_event(current, duration, tx);
             }
-
-            if win.title.trim().len() == 0 {
-                return
-            }
-
-            let _ = tx.send(EventModel {
-                window: win.clone(),
-                event_type: EventType::WindowSwitch,
-                timestamp: current_ts(),
-                duration,
-            });
         }
 
-        tracker.switch_app(win);
+        self.current = Some(next);
+        self.start_time = now;
+    }
+
+    fn key(&self, activity: &Activity) -> String {
+        let base = match &activity.window {
+            Some(w) => format!("{}::{}", w.process_name, w.title),
+            None => "UNKNOWN".into(),
+        };
+
+        if activity.idle {
+            format!("{}::IDLE", base)
+        } else {
+            base
+        }
+    }
+
+    pub fn finalize(&mut self, tx: &Sender<EventModel>) {
+        if let Some(current) = &self.current {
+            let duration = Instant::now() - self.start_time;
+            if duration.as_millis() > 0 {
+                let key = self.key(current);
+                *self.stats.entry(key).or_default() += duration;
+                self.send_event(current, duration, tx);
+            }
+        }
+
+        self.current = None;
     }
 }
-
 
 fn is_user_idle(threshold_secs: u32) -> bool {
     unsafe {
@@ -130,69 +135,60 @@ fn is_user_idle(threshold_secs: u32) -> bool {
     }
 }
 
-pub fn start_tracking(tx: Sender<EventModel>) {
-    unsafe {
-        EVENT_TX = Some(tx);
-        TRACKER = Some(Mutex::new(Tracker::new()));
-        RUNNING = true;
+pub fn start_tracking(tx: Sender<EventModel>, report_interval_ms: u64) {
+    let tracker = Arc::new(Mutex::new(Tracker::new(Duration::from_millis(report_interval_ms))));
+    let running = Arc::new(Mutex::new(true));
 
-        let hook = SetWinEventHook(
-            EVENT_SYSTEM_FOREGROUND,
-            EVENT_SYSTEM_FOREGROUND,
-            None,
-            Some(win_event_proc),
-            0,
-            0,
-            WINEVENT_OUTOFCONTEXT,
-        );
+    let t_tracker = tracker.clone();
+    let t_running = running.clone();
 
-        if hook.0.is_null() {
-            panic!("Failed to set hook");
-        }
+    thread::spawn(move || {
+        let poll_interval = Duration::from_millis(report_interval_ms);
 
-        HOOK = Some(hook);
+        while *t_running.lock().unwrap() {
+            let idle = is_user_idle(IDLE_THRESHOLD_SECS);
+            let next_activity = match get_current_window(None) {
+                Some(win) if !win.process_path.trim().is_empty() => Activity {
+                    window: Some(win),
+                    idle,
+                },
+                _ => Activity {
+                    window: None,
+                    idle: true,
+                },
+            };
 
-        println!("Listening for window changes...");
-
-        let mut msg = MSG::default();
-
-        while RUNNING && GetMessageW(&mut msg, None, 0, 0).into() {
-            if msg.message == WM_QUIT {
-                break;
+            let mut tracker = t_tracker.lock().unwrap();
+            match &tracker.current {
+                Some(current) if same_activity(current, &next_activity) => tracker.tick(&tx),
+                _ => tracker.switch(next_activity, &tx),
             }
 
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
+            drop(tracker);
+            thread::sleep(poll_interval);
         }
 
-        println!("Message loop exited");
+        let mut tracker = t_tracker.lock().unwrap();
+        tracker.finalize(&tx);
+
+    });
+}
+
+fn same_activity(a: &Activity, b: &Activity) -> bool {
+    if a.idle != b.idle {
+        return false;
+    }
+
+    match (&a.window, &b.window) {
+        (Some(w1), Some(w2)) => {
+            w1.title == w2.title && w1.process_name == w2.process_name
+        }
+        (None, None) => true,
+        _ => false,
     }
 }
 
-pub fn stop_tracking() {
-    unsafe {
-        RUNNING = false;
-
-        // 1. снимаем hook
-        if let Some(hook) = HOOK {
-            UnhookWinEvent(hook);
-            HOOK = None;
-        }
-
-        // 2. закрываем tracker
-        if let Some(t) = &TRACKER {
-            let mut tracker = t.lock().unwrap();
-            tracker.stop();
-        }
-
-        // 3. пробуждаем message loop (ВАЖНО!)
-        PostThreadMessageW(
-            GetCurrentThreadId(),
-            WM_QUIT,
-            WPARAM(0),
-            LPARAM(0),
-        );
-
-        println!("Tracking fully stopped");
-    }
+pub fn stop_tracking(running: Arc<Mutex<bool>>) {
+    let mut r = running.lock().unwrap();
+    *r = false;
 }

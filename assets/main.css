@@ -12,6 +12,7 @@
         color: var(--foreground);
         box-sizing: border-box;
         overflow: hidden auto ;
+        transition: all;
     }
     
     /* Скрытие скролбара */
@@ -38,8 +39,19 @@
         scrollbar-color: rgba(63, 63, 70, 0.5) transparent;
     }
 }
-
-
-
-
-
+@layer utilities {
+    @media (max-height: 12px) {
+        .max-h-\[12px\]\:\hidden {
+            display: none !important;
+        }
+        .event-text-hidden {
+            display: none !important;
+        }
+    }
+    .triangle-bottom {
+        width: 0; height: 0;
+        border-style: solid;
+        border-color: var(--background) transparent transparent transparent;
+        border-width: 12px 6px 0px 6px;
+    }
+}

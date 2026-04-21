@@ -28,6 +28,7 @@ windows = { version = "0.62.2", features = [
 ]}
 image = "0.25"
 base64 = "0.22"
+dioxus-signals = "0.7.4"
 
 
 

@@ -2,6 +2,7 @@ pub mod window;
 pub mod model;
 pub mod tracker;
 pub mod database;
+pub mod tray;
 
 pub use window::*;
 pub use model::*;

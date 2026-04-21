@@ -5,17 +5,24 @@ mod config;
 
 use core::*;
 use ui::*;
-use lib::*;
 use config::*;
 
-use std::{sync::{Arc, Mutex}, thread};
+use std::{
+    sync::Mutex,
+    thread,
+    time::Duration,
+};
 
-use dioxus::{desktop::{Config, WindowBuilder}, logger::tracing::Level, prelude::*};
-use crossbeam_channel::{unbounded, Sender, Receiver};
+use dioxus::{desktop::{Config, WindowBuilder}, logger::tracing::Level};
+use crossbeam_channel::Receiver;
 use once_cell::sync::Lazy;
 
 static RX: Lazy<Mutex<Option<Receiver<EventModel>>>> =
     Lazy::new(|| Mutex::new(None));
+
+const TRACKER_REPORT_INTERVAL_MS: u64 = 5_000;
+const DB_FLUSH_INTERVAL_MS: u64 = 750;
+const DB_BATCH_SIZE: usize = 64;
 
 
 
@@ -24,33 +31,59 @@ fn main() {
 
     let window_config = WindowBuilder::new().with_decorations(false);
 
-    let (tx, rx) = crossbeam_channel::unbounded::<EventModel>();
+    let (tx_forward, rx_forward) = crossbeam_channel::unbounded::<EventModel>();
+    let (tx_db, rx_db) = crossbeam_channel::unbounded::<EventModel>();
+    let (tx_ui, rx_ui) = crossbeam_channel::unbounded::<EventModel>();
 
     {
-        *RX.lock().unwrap() = Some(rx);
+        *RX.lock().unwrap() = Some(rx_ui);
     }
 
     thread::spawn(move || {
-        core::tracker::start_tracking(tx);
+        while let Ok(event) = rx_forward.recv() {
+            let _ = tx_db.send(event.clone());
+            let _ = tx_ui.send(event);
+        }
     });
 
     thread::spawn(move || {
-        let database = WindowsDatabase::new(DATABASE_PATH);
-
-        println!("Database path: {}", DATABASE_PATH);
+        let mut database = WindowsDatabase::new(DATABASE_PATH);
+        let mut pending = Vec::with_capacity(DB_BATCH_SIZE);
 
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            match rx_db.recv_timeout(Duration::from_millis(DB_FLUSH_INTERVAL_MS)) {
+                Ok(event) => {
+                    pending.push(event);
 
-            if let Ok(rx_guard) = RX.lock() {
-                if let Some(rx) = rx_guard.as_ref() {
-                    while let Ok(event) = rx.try_recv() {
-                        print!("{:?}", event.window.title);
-                        database.insert_event(&event).expect("Failed insert event");
+                    if pending.len() >= DB_BATCH_SIZE {
+                        if let Err(err) = database.insert_events(&pending) {
+                            eprintln!("Failed insert event batch: {:?}", err);
+                        }
+                        pending.clear();
                     }
+                }
+                Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                    if !pending.is_empty() {
+                        if let Err(err) = database.insert_events(&pending) {
+                            eprintln!("Failed insert event batch: {:?}", err);
+                        }
+                        pending.clear();
+                    }
+                }
+                Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                    if !pending.is_empty() {
+                        if let Err(err) = database.insert_events(&pending) {
+                            eprintln!("Failed insert event batch: {:?}", err);
+                        }
+                    }
+                    break;
                 }
             }
         }
+    });
+
+    thread::spawn(move || {
+        core::tracker::start_tracking(tx_forward, TRACKER_REPORT_INTERVAL_MS);
     });
 
     dioxus::LaunchBuilder::desktop()

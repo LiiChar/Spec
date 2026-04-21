@@ -1,7 +1,7 @@
 use windows::Win32::Foundation::RECT;
 
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rect {
     pub left: i32,
     pub top: i32,
@@ -24,7 +24,7 @@ impl Rect {
     }
 } 
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WindowModel {
     pub hwnd: isize,
 

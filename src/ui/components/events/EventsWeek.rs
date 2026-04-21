@@ -115,25 +115,29 @@ pub fn EventsWeek(props: EventsCalendarProps) -> Element {
                                         let top = (start_sec as f32 / 3600.0) * 100.0;
                                         let height = ((end_sec.saturating_sub(start_sec)) as f32 / 3600.0) * 100.0;
 
-                                        rsx! {
-                                            div {
-                                                class: "absolute group left-0 w-full bg-secondary/70 rounded-sm",
-                                                style: format!(
-                                                    "top: {}%; height: {}%;",
-                                                    top,
-                                                    height.max(2.0) // чтобы не исчезало
-                                                ),
-                                                title: format!(
-                                                    "{} - {}",
-                                                    start_dt.time(),
-                                                    end_dt.time()
-                                                ),
-                                                span {
-                                                  class: "group-hover:block hidden ",
-                                                  {e.window.title.clone()}
-                                                }
+                                        let window_title = e.window.as_ref()
+                                        .map(|w| w.title.clone())
+                                        .unwrap_or_else(|| "N/A".to_string());
+
+                                    rsx! {
+                                        div {
+                                            class: "absolute group left-0 w-full bg-secondary/70 rounded-sm",
+                                            style: format!(
+                                                "top: {}%; height: {}%;",
+                                                top,
+                                                height.max(2.0) // чтобы не исчезало
+                                            ),
+                                            title: format!(
+                                                "{} - {}",
+                                                start_dt.time(),
+                                                end_dt.time()
+                                            ),
+                                            span {
+                                              class: "group-hover:block hidden ",
+                                              "{window_title}"
                                             }
                                         }
+                                    }
                                     })}
                                 }
                             }
