@@ -3,7 +3,7 @@ use std::time::Duration;
 use rusqlite::{Connection, Result};
 use std::sync::{Arc, Mutex};
 
-use crate::core::{EventModel, EventType, Rect, WindowModel};
+use crate::core::{EventModel, EventType, Job, Rect, WindowModel};
 
 pub type Db = Arc<Mutex<WindowsDatabase>>;
 
@@ -44,6 +44,7 @@ impl WindowsDatabase {
 
                 title TEXT NOT NULL,
                 class_name TEXT,
+                icon_base64 TEXT,
 
                 process_name TEXT,
                 process_path TEXT,
@@ -78,6 +79,20 @@ impl WindowsDatabase {
                 duration INTEGER NOT NULL,
 
                 FOREIGN KEY(window_activity_id) REFERENCES window_activity(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                name TEXT NOT NULL,
+                description TEXT,
+                def_start_ts INTEGER,
+                def_end_ts INTEGER,
+                start_ts INTEGER NOT NULL,
+                end_ts INTEGER NOT NULL,
+                proccess_path TEXT,
+                cron TEXT,
+                color TEXT NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS idx_window_time
@@ -135,6 +150,8 @@ impl WindowsDatabase {
             )?;
         }
 
+
+
         Ok(())
     }
 
@@ -147,14 +164,14 @@ impl WindowsDatabase {
                 process_name, process_path, pid,
                 left, top, right, bottom, width, height,
                 is_minimized, is_maximized, is_visible, is_focused,
-                monitor_id, timestamp, duration
+                monitor_id, timestamp, duration, icon_base64
             )
             VALUES (
                 :hwnd, :title, :class_name,
                 :process_name, :process_path, :pid,
                 :left, :top, :right, :bottom, :width, :height,
                 :is_minimized, :is_maximized, :is_visible, :is_focused,
-                :monitor_id, :timestamp, :duration
+                :monitor_id, :timestamp, :duration, :icon_base64
             )
             "#,
             rusqlite::named_params! {
@@ -177,12 +194,12 @@ impl WindowsDatabase {
                 ":monitor_id": w.monitor_id.map(|v| v as i32),
                 ":timestamp": w.timestamp as i64,
                 ":duration": w.duration as i64,
+                ":icon_base64": w.icon_base64.as_deref(),
             },
         )?;
 
         Ok(self.conn.last_insert_rowid())
     }
-
     pub fn insert_event(&self, event: &EventModel) -> Result<()> {
         // 1. сохраняем окно
         let window_id: Option<i64> = match &event.window {
@@ -212,6 +229,43 @@ impl WindowsDatabase {
         Ok(())
     }
 
+    pub fn insert_jobs(&mut self, jobs: &Job) -> Result<()> {
+        let process_paths = jobs.proccess_path.iter().fold(String::new(), |acc, e| format!("{acc},{e:?}"));
+        self.conn.execute(
+            r#"
+            INSERT INTO jobs (
+                name,
+                description,
+                def_start_ts,
+                def_end_ts,
+                start_ts,
+                end_ts,
+                proccess_path,
+                cron,
+                color
+            )
+            VALUES (
+                :name, :description, :def_start_ts,
+                :def_end_ts, :start_ts, :end_ts,
+                :proccess_path, :cron, :color
+            )
+            "#,
+            rusqlite::named_params! {
+                ":name": jobs.name,
+                ":description": jobs.description,
+                ":def_start_ts": jobs.def_start_ts,
+                ":def_end_ts": jobs.def_end_ts,
+                ":start_ts": jobs.start_ts,
+                ":end_ts": jobs.end_ts,
+                ":proccess_path": process_paths,
+                ":cron": jobs.cron,
+                ":color": jobs.color
+            },
+        )?;
+
+        Ok(())
+    }
+
     pub fn insert_events(&mut self, events: &[EventModel]) -> Result<()> {
         if events.is_empty() {
             return Ok(());
@@ -229,14 +283,14 @@ impl WindowsDatabase {
                             process_name, process_path, pid,
                             left, top, right, bottom, width, height,
                             is_minimized, is_maximized, is_visible, is_focused,
-                            monitor_id, timestamp, duration
+                            monitor_id, timestamp, duration, icon_base64
                         )
                         VALUES (
                             :hwnd, :title, :class_name,
                             :process_name, :process_path, :pid,
                             :left, :top, :right, :bottom, :width, :height,
                             :is_minimized, :is_maximized, :is_visible, :is_focused,
-                            :monitor_id, :timestamp, :duration
+                            :monitor_id, :timestamp, :duration, :icon_base64
                         )
                         "#,
                         rusqlite::named_params! {
@@ -259,6 +313,7 @@ impl WindowsDatabase {
                             ":monitor_id": w.monitor_id.map(|v| v as i32),
                             ":timestamp": w.timestamp as i64,
                             ":duration": w.duration as i64,
+                            ":icon_base64": w.icon_base64.as_deref(),
                         },
                     )?;
 
@@ -290,8 +345,10 @@ impl WindowsDatabase {
     }
 
     fn row_to_event(row: &rusqlite::Row) -> Result<EventModel> {
-        let window = match row.get::<_, Option<i64>>(0)? {
-            Some(_) => Some(WindowModel {
+        let hwnd: Option<i64> = row.get(0).ok();
+
+        let window = if hwnd.is_some() {
+            Some(WindowModel {
                 hwnd: row.get(0)?,
                 title: row.get(1)?,
                 class_name: row.get(2)?,
@@ -313,19 +370,17 @@ impl WindowsDatabase {
                 monitor_id: row.get(16)?,
                 timestamp: row.get::<_, i64>(17)? as u64,
                 duration: row.get::<_, i64>(18)? as u64,
-            } ),
-            None => None,
+                icon_base64: row.get(22).ok(),
+            })
+        } else {
+            None
         };
-
-        let event_type = Self::event_type_from_i32(row.get(19)?);
-        let timestamp = row.get::<_, i64>(20)? as u64;
-        let duration = row.get::<_, i64>(21)? as u64;
 
         Ok(EventModel {
             window,
-            event_type,
-            timestamp,
-            duration,
+            event_type: Self::event_type_from_i32(row.get(19)?),
+            timestamp: row.get::<_, i64>(20)? as u64,
+            duration: row.get::<_, i64>(21)? as u64,
         })
     }
 
@@ -391,7 +446,7 @@ impl WindowsDatabase {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration
+                e.event_type, e.timestamp, e.duration, w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             WHERE e.timestamp BETWEEN ?1 AND ?2
@@ -415,7 +470,7 @@ impl WindowsDatabase {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration
+                e.event_type, e.timestamp, e.duration, w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             WHERE e.event_type = ?1
@@ -438,7 +493,7 @@ impl WindowsDatabase {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration
+                e.event_type, e.timestamp, e.duration, w.icon_base64
             FROM events e
             JOIN window_activity w ON e.window_activity_id = w.id
             WHERE w.process_name = ?1
@@ -473,6 +528,7 @@ impl WindowsDatabase {
                     is_visible: row.get(14)?,
                     is_focused: row.get(15)?,
                     monitor_id: row.get(16)?,
+                    icon_base64: row.get(22)?,
                     timestamp: w_ts as u64,
                     duration: w_dur as u64,
                 }),
@@ -532,7 +588,7 @@ impl WindowsDatabase {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration
+                e.event_type, e.timestamp, e.duration, w.icon_base64
             FROM events e
             JOIN window_activity w ON e.window_activity_id = w.id
             ORDER BY e.timestamp DESC
@@ -569,6 +625,7 @@ impl WindowsDatabase {
                     monitor_id: row.get(16)?,
                     timestamp: w_ts as u64,
                     duration: w_dur as u64,
+                    icon_base64: row.get(22)?,
                 }),
                 event_type: Self::event_type_from_i32(row.get(19)?),
                 timestamp: e_ts as u64,
@@ -588,7 +645,7 @@ impl WindowsDatabase {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration
+                e.event_type, e.timestamp, e.duration, w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             WHERE e.timestamp >= ?1
@@ -597,10 +654,16 @@ impl WindowsDatabase {
             "#,
         )?;
 
-        let mut events: Vec<EventModel> = stmt
-            .query_map([from_ts, limit], |row| Self::row_to_event(row))?
-            .filter_map(Result::ok)
-            .collect();
+        let mut events = Vec::new();
+
+        let rows = stmt.query_map([from_ts, limit], |row| Self::row_to_event(row))?;
+
+        for row in rows {
+            match row {
+                Ok(event) => events.push(event),
+                Err(err) => println!("DB row error: {:?}", err),
+            }
+        }
 
         events.reverse();
         Ok(events)

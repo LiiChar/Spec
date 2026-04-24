@@ -38,6 +38,17 @@
     * {
         scrollbar-color: rgba(63, 63, 70, 0.5) transparent;
     }
+
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    /* Firefox */
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
 }
 @layer utilities {
     @media (max-height: 12px) {
@@ -54,4 +65,97 @@
         border-color: var(--background) transparent transparent transparent;
         border-width: 12px 6px 0px 6px;
     }
+
+    .show-right {
+        animation: show-right 0.2s ease-in-out forwards;
+    }
+
+    @keyframes show-right {
+        from {
+            opacity: 0;
+            transform: translateX(-50%);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .show-left {
+        animation: show-left 0.2s ease-in-out forwards;
+    }
+
+    @keyframes show-left {
+        from {
+            opacity: 0;
+            transform: translateX(50%);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .show-top {
+        animation: show-top 0.2s ease-in-out forwards;
+    }
+
+    @keyframes show-top {
+        from {
+            opacity: 0;
+            transform: translateY(-50%);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .show-bottom {
+        animation: show-bottom 0.2s ease-in-out forwards;
+    }
+
+    @keyframes show-bottom {
+        from {
+            opacity: 0;
+            transform: translateY(50%);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    .fade-in {
+        animation: 0.2s ease-in-out forwards;
+    animation-name: fade-in;
+    }
+
+    @keyframes fade-out {
+        from {
+            opacity: 1;
+        }
+
+        to {
+            opacity: 0;
+        }
+    }
+
+    .fade-out {
+        animation: 0.2s ease-in-out forwards;
+        
+    animation-name: fade-out;
+    }
+
+    
 }

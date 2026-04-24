@@ -16,7 +16,7 @@ pub enum ChartType {
 
 #[derive(Props, PartialEq, Clone)]
 pub struct EventsChartsProps {
-    charts: Vec<ChartType>,
+    chart: ChartType,
 }
 
 const COLORS: &[&str] = &[
@@ -58,15 +58,16 @@ pub fn EventsCharts(props: EventsChartsProps) -> Element {
     rsx! {
         div {
             class: "flex flex-col gap-6 p-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg",
-            {props.charts.iter().map(|chart| {
-                match chart {
+            {
+                match props.chart {
                     ChartType::Bar => rsx! {
                         div {
                             class: "bg-white rounded-lg shadow-sm border border-slate-200 p-6",
                             h3 { 
-                                class: "text-xl font-semibold text-slate-900 mb-4",
+                                class: "text-xl font-semibold text-slate-900 mb-2",
                                 "Top Applications"
                             }
+                            p { class: "text-sm text-slate-600 mb-4", "Time spent on each application, sorted from least to most used." }
                             BarChart { data: summary.3.clone() }
                         }
                     },
@@ -81,7 +82,7 @@ pub fn EventsCharts(props: EventsChartsProps) -> Element {
                         }
                     },
                 }
-            })}
+            }
         }
     }
 }
@@ -134,52 +135,77 @@ fn BarChart(data: Vec<(String, u64)>) -> Element {
 fn TimelineChart(events: ReadSignal<Vec<EventModel>>) -> Element {
     let items = events.read().clone();
     
-    let mut hour_events: HashMap<u32, Vec<EventModel>> = HashMap::new();
-    for event in items.iter() {
-        let hour = chrono::DateTime::from_timestamp_millis(event.timestamp as i64)
-            .map(|dt| dt.with_timezone(&Local).hour())
-            .unwrap_or(0);
-        
-        hour_events.entry(hour).or_default().push(event.clone());
-    }
+    let items_clone = items.clone();
+    let hour_data = use_memo(move || {
+        (0..24).map(|hour| {
+            let mut apps: HashMap<String, u64> = HashMap::new();
+            for event in items_clone.iter() {
+                let event_hour = chrono::DateTime::from_timestamp_millis(event.timestamp as i64)
+                    .map(|dt| dt.with_timezone(&Local).hour())
+                    .unwrap_or(0);
+                if event_hour == hour {
+                    if let Some(window) = &event.window {
+                        *apps.entry(window.process_name.clone()).or_default() += event.duration;
+                    }
+                }
+            }
+            apps
+        }).collect::<Vec<HashMap<String, u64>>>()
+    });
 
     let total_time: u64 = items.iter().map(|e| e.duration).sum();
+    let max_hour_time = hour_data().iter()
+        .map(|apps| apps.values().sum::<u64>())
+        .max()
+        .unwrap_or(1);
+
+    let mut hovered_hour = use_signal(|| None::<u32>);
 
     rsx! {
         div {
-            class: "w-full",
+            class: "w-full relative",
             div {
                 class: "flex items-end gap-2 h-64 bg-gradient-to-t from-slate-50 to-transparent rounded-md p-4 border border-slate-200",
                 {(0..24).map(|hour| {
-                    let hour_total = hour_events.get(&hour)
-                        .map(|evts| evts.iter().map(|e| e.duration).sum::<u64>())
-                        .unwrap_or(0);
-                    
-                    let height_percent = if total_time > 0 {
-                        (hour_total as f64 / total_time as f64) * 100.0
-                    } else {
-                        0.0
-                    };
-
-                    let has_events = hour_total > 0;
-                    let color = if has_events { "#3B82F6" } else { "#E2E8F0" };
+let mut sorted_apps = hour_data()[hour as usize].iter().map(|(k, v)| (k.clone(), *v)).collect::<Vec<(String, u64)>>();
+                sorted_apps.sort_by(|a, b| b.1.cmp(&a.1));
+                    let hour_total = sorted_apps.iter().map(|(_, time)| *time).sum::<u64>();
 
                     rsx! {
                         div {
-                            class: "flex-1 flex flex-col items-center justify-end gap-1",
+                            class: "flex-1 flex flex-col justify-end h-full relative",
+                            onmouseover: move |_| hovered_hour.set(Some(hour)),
+                            onmouseout: move |_| hovered_hour.set(None),
+                            {sorted_apps.iter().enumerate().map(|(i, (app, time))| {
+                                let height_percent = if max_hour_time > 0 {
+                                    (hour_total as f64 / max_hour_time as f64) * 100.0
+                                } else {
+                                    0.0
+                                };
+                                let segment_height = if hour_total > 0 {
+                                    (*time as f64 / hour_total as f64) * height_percent
+                                } else {
+                                    0.0
+                                };
+                                let color = get_color(i);
+
+                                rsx! {
+                                    div {
+                                        class: "w-full rounded-t-sm",
+                                        style: "height: {segment_height}%; background-color: {color};",
+                                    }
+                                }
+                            })}
                             div {
-                                class: "w-full rounded-t-md transition-all duration-300 hover:shadow-lg",
-                                style: "height: {height_percent}%; background-color: {color}; min-height: 2px;",
-                                title: "{hour}:00 - {hour_total}ms"
-                            }
-                            div {
-                                class: "text-xs font-medium text-slate-600 mt-1",
+                                class: "text-xs font-medium text-slate-600 mt-1 text-center",
                                 "{hour}"
                             }
                         }
                     }
                 })}
             }
+            // Hover popup
+
             div {
                 class: "mt-4 grid grid-cols-4 gap-4 text-sm",
                 div {
@@ -187,12 +213,7 @@ fn TimelineChart(events: ReadSignal<Vec<EventModel>>) -> Element {
                     p { class: "text-blue-900 font-semibold", "Total" }
                     p { 
                         class: "text-blue-700 font-bold text-lg",
-                        {
-                            let total_ms = total_time;
-                            let h = total_ms / (1000 * 60 * 60);
-                            let m = (total_ms % (1000 * 60 * 60)) / (1000 * 60);
-                            format!("{}h {}m", h, m)
-                        }
+                        "{format_duration(total_time)}"
                     }
                 }
                 div {
@@ -200,15 +221,7 @@ fn TimelineChart(events: ReadSignal<Vec<EventModel>>) -> Element {
                     p { class: "text-purple-900 font-semibold", "Peak" }
                     p { 
                         class: "text-purple-700 font-bold text-lg",
-                        {
-                            let peak = hour_events.values()
-                                .map(|evts| evts.iter().map(|e| e.duration).sum::<u64>())
-                                .max()
-                                .unwrap_or(0);
-                            let h = peak / (1000 * 60 * 60);
-                            let m = (peak % (1000 * 60 * 60)) / (1000 * 60);
-                            format!("{}h {}m", h, m)
-                        }
+                        "{format_duration(max_hour_time)}"
                     }
                 }
                 div {
@@ -225,7 +238,7 @@ fn TimelineChart(events: ReadSignal<Vec<EventModel>>) -> Element {
                     p { 
                         class: "text-orange-700 font-bold text-lg",
                         {
-                            let hours_active = (0..24).filter(|h| hour_events.contains_key(h)).count().max(1);
+                            let hours_active = hour_data().iter().filter(|apps| !apps.is_empty()).count().max(1);
                             let avg_per_hour = items.len() / hours_active;
                             format!("{}", avg_per_hour)
                         }
@@ -234,4 +247,10 @@ fn TimelineChart(events: ReadSignal<Vec<EventModel>>) -> Element {
             }
         }
     }
+}
+
+fn format_duration(ms: u64) -> String {
+    let h = ms / (1000 * 60 * 60);
+    let m = (ms % (1000 * 60 * 60)) / (1000 * 60);
+    format!("{}h {}m", h, m)
 }

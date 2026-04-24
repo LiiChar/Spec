@@ -1,9 +1,12 @@
 use std::{ops::Add, time::Duration};
 
-use chrono::{Local, Month, TimeZone};
-use dioxus::{desktop::{WindowCloseBehaviour, use_window}, prelude::*};
+use chrono::{Local, Month, TimeZone, Timelike};
+use dioxus::{desktop::{WindowCloseBehaviour, muda::Icon, use_window}, prelude::*};
 
-use crate::ui::{AppContext, EventsCalendar};
+use dioxus_free_icons::icons::ld_icons::{LdPlus, LdMinus};
+use dioxus_free_icons::Icon;
+
+use crate::ui::{AppContext, EventsCalendar, TimeInput};
 
 #[component]
 pub fn Header() -> Element {
@@ -12,6 +15,58 @@ pub fn Header() -> Element {
     let mut context = use_context::<AppContext>();
     let events = context.events;
     let day = context.day;
+    let mut time = context.time;
+    let mut start_time = context.start_time;
+
+
+
+    let mut time_start = use_signal(|| {
+        let now = Local::now().time();
+        now.hour() * 3600 +
+            now.minute() * 60 +
+            now.second()
+    });
+    let mut time_end = use_signal(|| {
+        let now = Local::now().time();
+
+        now.hour() * 3600 +
+            now.minute() * 60 +
+            now.second()
+    });
+
+    use_effect(move || {
+        let day_dt = day.read();
+
+        let start_of_day = day_dt
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Local)
+            .unwrap()
+            .timestamp_millis();
+
+        let end_time = *time_end.read() as i64;
+
+        time.set(start_of_day + end_time * 1000);
+    });
+
+    use_effect(move || {
+        let day_dt = day.read();
+
+        let start_of_day = day_dt
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_local_timezone(Local)
+            .unwrap()
+            .timestamp_millis();
+
+        let st_time = *time_start.read() as i64;
+
+        start_time.set(Some(start_of_day + st_time * 1000));
+    });
+
+    let mut filter_time = use_signal(|| false);
 
     let drag_window = window.clone();
     let close_window = window.clone();
@@ -28,7 +83,6 @@ pub fn Header() -> Element {
             }
         });
     });
-
 
     rsx! {
         div {
@@ -48,6 +102,10 @@ pub fn Header() -> Element {
                     onclick: move |evt| {
                         evt.stop_propagation();
                         evt.prevent_default();
+                        if show_calendar() {
+                            filter_time.set(false);
+                            start_time.set(None);
+                        }
                         show_calendar.set(!show_calendar());
                     },
                     class: "relative text-sm",
@@ -65,8 +123,12 @@ pub fn Header() -> Element {
                     if show_calendar() {
                        
                         div { 
+                            onmount: move |_| {
+                                filter_time.set(false);
+                                start_time.set(None);
+                            },
                             onclick: move |evt| evt.stop_propagation(),
-                            class: "absolute top-8 right-0 select-none",
+                            class: "absolute top-8 right-0 select-none show-left",
                              div { 
                                 
                                 class: "absolute backdrop-blur-lg cursor-pointer -top-[33px] left-0 flex gap-1  flex-row  items-center justify-center h-[30px] rounded-full bg-background/20   border border-border/30 text-sm p-0.5",
@@ -98,6 +160,36 @@ pub fn Header() -> Element {
                                     .unwrap();
                                 context.day.set(cl_day);
                             } }
+
+                            div { 
+                                
+                                class: "absolute backdrop-blur-lg cursor-pointer -bottom-[33px] left-0 flex gap-1  flex-row  items-center justify-center h-[30px]  w-full",
+                                if *filter_time.read() {
+
+                                    div {
+                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 show-left",
+                                        TimeInput { value: time_start.clone() },
+                                    }
+                                    div { 
+                                        onclick: move |_| {
+                                            filter_time.set(false);
+                                            start_time.set(None);
+                                        },
+                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 aspect-square min-w-[26px] flex items0-center justify-center",
+                                        Icon { icon: LdMinus }
+                                    },
+                                    div { 
+                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 show-right",
+                                        TimeInput { value: time_end.clone() },
+                                    }
+                                } else {
+                                    div { 
+                                        onclick: move |_| filter_time.set(true),
+                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 aspect-square min-w-[26px] flex items0-center justify-center",
+                                    Icon { icon: LdPlus }
+                                    },
+                                }
+                            } 
                         }
                     }
                 },

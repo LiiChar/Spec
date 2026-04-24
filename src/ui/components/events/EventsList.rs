@@ -46,7 +46,7 @@ pub fn EventsList(events: ReadSignal<Vec<EventModel>>) -> Element {
 
                 div {
                     class: "flex flex-col items-center",
-                    span { class: "text-gray-400 text-sm", "Приложения" }
+                    span { class: "text-gray-400 text-sm", "Приложения" } 
                     span { class: "text-2xl font-bold text-purple-400", "{app_count}" }
                 }
 
@@ -88,14 +88,19 @@ pub fn EventsList(events: ReadSignal<Vec<EventModel>>) -> Element {
                         div {
                             class: "group relative flex flex-row items-center gap-3 px-4 py-3 bg-zinc-900/40 hover:bg-zinc-800/60 rounded-lg border border-zinc-700/30 hover:border-zinc-600/50 transition-all cursor-pointer",
 
-                            div {
-                                class: format!("flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br {} text-white font-bold text-lg select-none cursor-grab active:cursor-grabbing hover:scale-110 transition-transform", color_gradient),
-                                draggable: "true",
-                                ondragstart: move |evt| {
-                                    let data = evt.data_transfer();
-                                    let _ = data.set_data("text/plain", &process_name);
-                                    let _ = data.set_data("application/x-process-info", &pid_str);
-                                },
+                            if let Some(window) = window_info {
+                                if let Some(icon) = window.icon_base64.as_deref() {
+                                    img {
+                                        src: icon
+                                    }
+                                } else {
+                                    div {
+                                        class: format!(
+                                            "flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br {} text-white font-bold text-lg select-none cursor-grab active:cursor-grabbing hover:scale-110 transition-transform",
+                                            color_gradient
+                                        ),
+                                    }
+                                }
                             }
 
                             div {

@@ -7,8 +7,8 @@ use crate::{
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
-const INITIAL_EVENT_LIMIT: i64 = 2_500;
-const MAX_EVENTS_IN_MEMORY: usize = 5_000;
+const INITIAL_EVENT_LIMIT: i64 = 10_500;
+const MAX_EVENTS_IN_MEMORY: usize = 15_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Theme {
@@ -20,15 +20,22 @@ enum Theme {
 pub struct AppContext {
     pub theme: Theme,
     pub day: Signal<DateTime<Local>>,
+    pub time: Signal<i64>,
+    pub start_time: Signal<Option<i64>>,
     pub events: Signal<Vec<EventModel>>
 } 
 
 impl Default for AppContext {
+    
     fn default() -> Self {
+        let now = Local::now().timestamp_millis();
+            
         Self {
             theme: Theme::Light,
             events: Signal::new(Vec::new()),
             day: Signal::new(Local::now()),
+            time: Signal::new(now as i64),
+            start_time: Signal::new(None),
         }
     }
 }
@@ -40,7 +47,58 @@ pub fn Root() -> Element {
     let context = use_context::<AppContext>();
     let mut events = context.events;
     let day = context.day;
+    let time = context.time;
+    let start_time = context.start_time;
     let mut did_start = use_signal(|| false);
+
+    use_effect(move || {
+        let selected_time = *time.read(); // копируем i64
+        let selected_start_time = *start_time.read(); // копируем Option<i64>
+
+        if selected_start_time.is_none() {
+            let selected_day = day.read().date_naive();
+
+            spawn(async move {
+                let start_of_day = selected_day
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Local)
+                    .unwrap()
+                    .timestamp_millis();
+
+                let result = tokio::task::spawn_blocking(move || {
+                    WindowsDatabase::new(DATABASE_PATH)
+                        .get_events_since(start_of_day, INITIAL_EVENT_LIMIT)
+                })
+                .await
+                .unwrap();
+
+                if let Ok(events_loaded) = result {
+                    println!("Events loaded: {:?}", events_loaded.len());
+                    events.set(events_loaded);
+                }
+            });
+
+            return;
+        }
+
+        let start = selected_start_time.unwrap();
+        let end = selected_time;
+
+        spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                WindowsDatabase::new(DATABASE_PATH)
+                    .get_events_in_range(start, end)
+            })
+            .await
+            .unwrap();
+
+            if let Ok(events_loaded) = result {
+                println!("Events loaded: {:?}", events_loaded.len());
+                events.set(events_loaded);
+            }
+        });
+    });
 
     use_effect(move || {
         let selected_day = day.read().date_naive();
@@ -61,6 +119,7 @@ pub fn Root() -> Element {
             .unwrap();
 
             if let Ok(events_loaded) = result {
+                println!("Events loaded: {:?}", events_loaded.len());
                 events.set(events_loaded);
             }
         });

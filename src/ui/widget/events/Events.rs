@@ -5,13 +5,14 @@ use dioxus::prelude::*;
 use crate::{
     core::EventModel,
     lib::format_duration_short,
-    ui::{AppContext, ChartType, EventsCharts, EventsList, EventsTimeline, TimelineOrientation},
+    ui::{AppContext, ChartType, EventsCharts, EventsList, EventsStats, EventsTimeline, TimelineOrientation},
 };
 
 #[derive(PartialEq, Clone)]
 pub enum ViewMode {
     Timeline,
     List,
+    Stats
 }
 
 #[component]
@@ -77,10 +78,26 @@ pub fn Events() -> Element {
                         onclick: move |_| view_mode.set(ViewMode::List),
                         "Список"
                     }
+
+                    button {
+                        class: format!(
+                            "p-1 px-2 rounded-r-lg cursor-pointer {}",
+                            if view_mode() == ViewMode::Stats {
+                                "bg-background"
+                            } else {
+                                ""
+                            },
+                        ),
+                        onclick: move |_| view_mode.set(ViewMode::Stats),
+                        "Статистика"
+                    }
                 }
             }
 
-            // EventsCharts {charts: vec![ChartType::Bar, ChartType::Timeline]}
+            // EventsCharts {chart: match view_mode() {
+            //     ViewMode::Timeline => ChartType::Timeline,
+            //     ViewMode::List => ChartType::Bar,
+            // }}
 
             match view_mode() {
                 ViewMode::Timeline => rsx! {
@@ -153,7 +170,13 @@ pub fn Events() -> Element {
                         class: "flex-1 flex flex-col p-2",
                         EventsList { events }
                     }
-                }
+                },
+                ViewMode::Stats => rsx! {
+                    div {
+                        class: "flex-1 flex flex-col p-2",
+                        EventsStats {  }
+                    }
+                },
             }
         }
     }

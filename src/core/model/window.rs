@@ -30,6 +30,7 @@ pub struct WindowModel {
 
     pub title: String,
     pub class_name: String,
+    pub icon_base64: Option<String>,
 
     pub process_name: String,
     pub process_path: String,

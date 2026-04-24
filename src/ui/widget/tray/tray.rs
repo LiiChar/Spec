@@ -11,6 +11,11 @@ const TRAY_ICON: Asset = asset!("/assets/tray_icon.png");
 #[component]
 pub fn Tray() -> Element {
     use std::sync::Arc;
+    if !Path::new(TRAY_ICON.bundled().absolute_source_path()).exists() {
+        return rsx! {
+            ""
+        }
+    }
     let icon = load_icon(&Path::new(TRAY_ICON.bundled().absolute_source_path()));
 
     let menu = Menu::new();

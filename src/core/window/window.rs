@@ -1,12 +1,17 @@
+use base64::Engine;
+use base64::engine::general_purpose;
+use image::{ImageBuffer, Rgba};
 use windows::Win32::Foundation::{HWND, RECT};
-use windows::Win32::Graphics::Gdi::{HMONITOR, MONITOR_DEFAULTTONEAREST, MonitorFromWindow};
+use windows::Win32::Graphics::Gdi::{BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, DeleteObject, GetDC, GetDIBits, GetObjectW, HMONITOR, MONITOR_DEFAULTTONEAREST, MonitorFromWindow, ReleaseDC};
 use windows::Win32::System::SystemInformation::GetTickCount;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+use windows::Win32::UI::Shell::ExtractIconExW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetForegroundWindow, GetWindowPlacement, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible, SW_MINIMIZE, SW_SHOWMAXIMIZED, WINDOWPLACEMENT
+    DestroyIcon, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindowPlacement, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, HICON, ICONINFO, IsWindowVisible, SW_MINIMIZE, SW_SHOWMAXIMIZED, WINDOWPLACEMENT
 };
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
 use windows::Win32::System::ProcessStatus::K32GetModuleFileNameExW;
+use windows::core::PCWSTR;
 
 use crate::core::{Rect, WindowModel};
 use crate::lib::{current_ts, get_class_name, get_current_monitor, get_idle_time, get_window_placement};
@@ -51,6 +56,8 @@ pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
 
         let monitor = get_current_monitor(hwnd);
 
+        let icon = unsafe { extract_icon_base64(process_path.as_str()) };
+
         let duration = get_idle_time();
 
         Some(WindowModel {
@@ -67,7 +74,8 @@ pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
             is_focused: true,
             monitor_id: Some(monitor.0 as u32),
             timestamp: current_ts(),
-            duration: duration
+            duration: duration,
+            icon_base64: icon,
         })
     }
 }
@@ -140,3 +148,83 @@ unsafe fn get_process_info(pid: u32) -> (String, String) {
     (process_name, process_path)
 }
 
+unsafe fn extract_icon_base64(path: &str) -> Option<String> {
+    let wide: Vec<u16> = path.encode_utf16().chain(Some(0)).collect();
+
+    let mut large_icon = HICON::default();
+
+    let count = ExtractIconExW(
+        PCWSTR(wide.as_ptr()),
+        0,
+        Some(&mut large_icon),
+        None,
+        1,
+    );
+
+    if count == 0 {
+        return None;
+    }
+
+    let icon = large_icon;
+
+    let mut icon_info = ICONINFO::default();
+    GetIconInfo(icon, &mut icon_info);
+
+    let mut bmp = BITMAP::default();
+    GetObjectW(
+        icon_info.hbmColor.into(),
+        std::mem::size_of::<BITMAP>() as i32,
+        Some(&mut bmp as *mut _ as *mut _),
+    );
+
+    let width = bmp.bmWidth as u32;
+    let height = bmp.bmHeight as u32;
+
+    let mut bmi = BITMAPINFO::default();
+    bmi.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+    bmi.bmiHeader.biWidth = width as i32;
+    bmi.bmiHeader.biHeight = -(height as i32);
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB.0;
+
+    let mut buffer = vec![0u8; (width * height * 4) as usize];
+
+    let hdc = GetDC(Some(HWND::default()));
+
+    GetDIBits(
+        hdc,
+        icon_info.hbmColor,
+        0,
+        height as u32,
+        Some(buffer.as_mut_ptr() as *mut _),
+        &mut bmi,
+        DIB_RGB_COLORS,
+    );
+
+    ReleaseDC(Some(HWND::default()), hdc);
+
+    // cleanup
+    DeleteObject(icon_info.hbmColor.into());
+    DeleteObject(icon_info.hbmMask.into());
+    DestroyIcon(icon);
+
+    // BGRA → RGBA
+    for chunk in buffer.chunks_exact_mut(4) {
+        chunk.swap(0, 2);
+    }
+
+    let img: ImageBuffer<Rgba<u8>, _> =
+        ImageBuffer::from_raw(width, height, buffer)?;
+
+    let mut png_bytes = Vec::new();
+    img.write_to(
+        &mut std::io::Cursor::new(&mut png_bytes),
+        image::ImageFormat::Png,
+    ).ok()?;
+
+    Some(format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(png_bytes)
+    ))
+}
