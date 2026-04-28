@@ -1,30 +1,26 @@
-mod core;
-mod ui;
-mod lib;
 mod config;
+mod core;
+mod lib;
+mod ui;
 
+use config::*;
 use core::*;
 use ui::*;
-use config::*;
 
-use std::{
-    sync::Mutex,
-    thread,
-    time::Duration,
-};
+use std::{sync::Mutex, thread, time::Duration};
 
-use dioxus::{desktop::{Config, WindowBuilder}, logger::tracing::Level};
 use crossbeam_channel::Receiver;
+use dioxus::{
+    desktop::{Config, WindowBuilder},
+    logger::tracing::Level,
+};
 use once_cell::sync::Lazy;
 
-static RX: Lazy<Mutex<Option<Receiver<EventModel>>>> =
-    Lazy::new(|| Mutex::new(None));
+static RX: Lazy<Mutex<Option<Receiver<EventModel>>>> = Lazy::new(|| Mutex::new(None));
 
 const TRACKER_REPORT_INTERVAL_MS: u64 = 5_000;
 const DB_FLUSH_INTERVAL_MS: u64 = 750;
 const DB_BATCH_SIZE: usize = 64;
-
-
 
 fn main() {
     dioxus::logger::init(Level::INFO).unwrap();
@@ -90,4 +86,3 @@ fn main() {
         .with_cfg(Config::new().with_window(window_config))
         .launch(Root);
 }
-        

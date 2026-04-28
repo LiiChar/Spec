@@ -4904,6 +4904,7 @@ dependencies = [
  "image",
  "once_cell",
  "rusqlite",
+ "serde",
  "tokio",
  "windows 0.62.2",
 ]

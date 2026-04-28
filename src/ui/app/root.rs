@@ -2,7 +2,7 @@ use chrono::{DateTime, Datelike, Local, NaiveDate, Timelike};
 use dioxus::prelude::*;
 
 use crate::{
-    RX, config::DATABASE_PATH, core::{EventModel, WindowsDatabase, tray}, lib::convert_ts_to_local_date, ui::{Events, Layout, Tray}
+    RX, config::DATABASE_PATH, core::{EventModel, JobModel, WindowsDatabase, tray}, lib::convert_ts_to_local_date, ui::{Events, Layout, Tray}
 };
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -22,7 +22,8 @@ pub struct AppContext {
     pub day: Signal<DateTime<Local>>,
     pub time: Signal<i64>,
     pub start_time: Signal<Option<i64>>,
-    pub events: Signal<Vec<EventModel>>
+    pub events: Signal<Vec<EventModel>>,
+    pub jobs: Signal<Vec<JobModel>>,
 } 
 
 impl Default for AppContext {
@@ -36,6 +37,7 @@ impl Default for AppContext {
             day: Signal::new(Local::now()),
             time: Signal::new(now as i64),
             start_time: Signal::new(None),
+            jobs: Signal::new(Vec::new()),
         }
     }
 }
@@ -46,6 +48,7 @@ pub fn Root() -> Element {
 
     let context = use_context::<AppContext>();
     let mut events = context.events;
+    let mut jobs = context.jobs;
     let day = context.day;
     let time = context.time;
     let start_time = context.start_time;
@@ -96,6 +99,39 @@ pub fn Root() -> Element {
             if let Ok(events_loaded) = result {
                 println!("Events loaded: {:?}", events_loaded.len());
                 events.set(events_loaded);
+            }
+        });
+    });
+
+    // Load jobs for the selected day
+    use_effect(move || {
+        let selected_day = day.read().date_naive();
+
+        spawn(async move {
+            let start_of_day = selected_day
+                .and_hms_opt(0, 0, 0)
+                .unwrap()
+                .and_local_timezone(Local)
+                .unwrap()
+                .timestamp_millis();
+            
+            let end_of_day = selected_day
+                .and_hms_opt(23, 59, 59)
+                .unwrap()
+                .and_local_timezone(Local)
+                .unwrap()
+                .timestamp_millis();
+
+            let result = tokio::task::spawn_blocking(move || {
+                WindowsDatabase::new(DATABASE_PATH)
+                    .get_jobs_for_day(start_of_day, end_of_day)
+            })
+            .await
+            .unwrap();
+
+            if let Ok(jobs_loaded) = result {
+                println!("Jobs loaded: {:?}", jobs_loaded.len());
+                jobs.set(jobs_loaded);
             }
         });
     });

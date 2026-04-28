@@ -61,7 +61,7 @@ pub fn EventsStats() -> Element {
         let seconds = (t % 60000) / 1000;
         format!("{}h {}m {}s", hours, minutes, seconds)
     };
-    
+
     let fmt_start_date = events.read().first().map(|e| {
        let date = convert_ts_to_local_date(e.timestamp);
        date.format("%d.%m.%Y %H:%M:%S").to_string()
@@ -77,9 +77,9 @@ pub fn EventsStats() -> Element {
             class: "flex flex-col gap-2 rounded-lg",
             div {
                 class: "rounded-lg shadow-sm p-3 bg-secondary/20 border border-border/30",
-                h3 { class: "text-xl font-semibold mb-4 flex flex-col  ", 
+                h3 { class: "text-xl font-semibold mb-4 flex flex-col  ",
                     span {
-                        "Statistics" 
+                        "Статистика"
                     }
                     span {
                         class: "text-sm text-muted-foreground/50",
@@ -88,48 +88,48 @@ pub fn EventsStats() -> Element {
                 }
                 div { class: "grid grid-cols-2 gap-4",
                     div {
-                        class: "text-sm text-muted-foreground/50", "Total Time"
-                        div { class: "text-2xl font-bold text-foreground", "{format_time(total_time)}" }
+                        class: "text-sm text-muted-foreground/50", "Общее время"
+                        div { class: "text-lg font-bold text-foreground", "{format_time(total_time)}" }
                     }
                     div {
-                        class: "text-sm text-muted-foreground/50", "Active Time"
-                        div { class: "text-2xl font-bold text-foreground text-green-600", "{format_time(active_time)}" }
+                        class: "text-sm text-muted-foreground/50", "Активное время"
+                        div { class: "text-lg font-bold text-foreground text-green-600", "{format_time(active_time)}" }
                     }
                     div {
-                        class: "text-sm text-muted-foreground/50", "Idle Time"
-                        div { class: "text-2xl font-bold text-foreground", "{format_time(idle_time)}" }
+                        class: "text-sm text-muted-foreground/50", "Бездействие"
+                        div { class: "text-lg font-bold text-foreground", "{format_time(idle_time)}" }
                     }
                     div {
-                        class: "text-sm text-muted-foreground/50", "Events Count"
-                        div { class: "text-2xl font-bold text-foreground", "{num_events}" }
+                        class: "text-sm text-muted-foreground/50", "Количество событий"
+                        div { class: "text-lg font-bold text-foreground", "{num_events}" }
                     }
                     div {
-                        class: "text-sm text-muted-foreground/50", "Average Event Duration"
-                        div { class: "text-2xl font-bold text-foreground", "{format_time(avg_event_duration)}" }
+                        class: "text-sm text-muted-foreground/50", "Средняя продолжительность события"
+                        div { class: "text-lg font-bold text-foreground", "{format_time(avg_event_duration)}" }
                     }
                     if let Some((app, active, idle, icon)) = most_used_app {
                         div {
-                            class: "text-sm text-muted-foreground/50", "Most Used App"
+                            class: "text-sm text-muted-foreground/50", "Самое используемое приложение"
                             div { class: "text-lg font-bold text-foreground", "{app}" }
-                            div { class: "text-sm text-muted-foreground/50", "Active: {format_time(active)}, Idle: {format_time(idle)}" }
+                            div { class: "text-sm text-muted-foreground/50", "Активность: {format_time(active)}, Бездействие: {format_time(idle)}" }
                         }
                     }
                 }
             }
             div {
                 class: " rounded-lg shadow-sm  p-3 bg-secondary/20 border border-border/30",
-                h3 { class: "text-xl font-semibold mb-4", "Applications ({num_apps})" }
+                h3 { class: " font-semibold mb-4", "Приложения ({num_apps})" }
                 div { class: "space-y-3",
                     for (app, active, idle, icon) in app_list {
                         div { class: "flex justify-between items-center",
                             div {
-                                class: "flex gap-3 items-center justify-center", 
+                                class: "flex gap-3 items-center justify-center",
                                 if let Some(icon) = icon {
                                     img { src: icon }
                                 }
                                 span { class: "font-medium", "{app}" }
                             }
-                            div { class: "flex flex-col gap-1",
+                            div { class: "flex flex-col gap-1 text-end",
                                 span { class: "text-foreground", "{format_time(active)}" }
                                 span { class: "text-muted-foreground/50 text-xs", "{format_time(idle)} idle" }
                             }

@@ -71,7 +71,7 @@ pub fn TimeInput(props: TimeInputProps) -> Element {
                     }
                 },
             }
-            span { 
+            span {
               ":"
              }
             // MINUTES
@@ -89,7 +89,7 @@ pub fn TimeInput(props: TimeInputProps) -> Element {
                     }
                 },
             }
-            span { 
+            span {
               ":"
              }
             // SECONDS

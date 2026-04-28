@@ -3,7 +3,7 @@ use std::time::Duration;
 use rusqlite::{Connection, Result};
 use std::sync::{Arc, Mutex};
 
-use crate::core::{EventModel, EventType, Job, Rect, WindowModel};
+use crate::core::{EventModel, EventType, JobModel, Rect, WindowModel};
 
 pub type Db = Arc<Mutex<WindowsDatabase>>;
 
@@ -229,7 +229,7 @@ impl WindowsDatabase {
         Ok(())
     }
 
-    pub fn insert_jobs(&mut self, jobs: &Job) -> Result<()> {
+    pub fn insert_jobs(&mut self, jobs: &JobModel) -> Result<()> {
         let process_paths = jobs.proccess_path.iter().fold(String::new(), |acc, e| format!("{acc},{e:?}"));
         self.conn.execute(
             r#"
@@ -264,6 +264,120 @@ impl WindowsDatabase {
         )?;
 
         Ok(())
+    }
+
+    pub fn save_job(&self, job: &JobModel) -> Result<i64> {
+        let process_paths = job.proccess_path.iter().fold(String::new(), |acc, e| format!("{acc},{e:?}"));
+        self.conn.execute(
+            r#"
+            INSERT INTO jobs (
+                name,
+                description,
+                def_start_ts,
+                def_end_ts,
+                start_ts,
+                end_ts,
+                proccess_path,
+                cron,
+                color
+            )
+            VALUES (
+                :name, :description, :def_start_ts,
+                :def_end_ts, :start_ts, :end_ts,
+                :proccess_path, :cron, :color
+            )
+            "#,
+            rusqlite::named_params! {
+                ":name": job.name,
+                ":description": job.description,
+                ":def_start_ts": job.def_start_ts,
+                ":def_end_ts": job.def_end_ts,
+                ":start_ts": job.start_ts,
+                ":end_ts": job.end_ts,
+                ":proccess_path": process_paths,
+                ":cron": job.cron,
+                ":color": job.color
+            },
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_jobs(&self) -> Result<Vec<JobModel>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT
+                id, name, description,
+                def_start_ts, def_end_ts,
+                start_ts, end_ts,
+                proccess_path, cron, color
+            FROM jobs
+            ORDER BY start_ts DESC
+            "#,
+        )?;
+
+        let jobs = stmt.query_map([], |row| {
+            let proccess_path_str: String = row.get(7)?;
+            let proccess_path: Vec<Option<i64>> = proccess_path_str
+                .split(',')
+                .filter(|s| !s.is_empty() && s.to_string() != "None")
+                .map(|s| s.trim().parse::<i64>().ok())
+                .collect();
+
+            Ok(JobModel {
+                name: row.get(1)?,
+                description: row.get(2)?,
+                def_start_ts: row.get(3)?,
+                def_end_ts: row.get(4)?,
+                start_ts: row.get(5)?,
+                end_ts: row.get(6)?,
+                proccess_path,
+                cron: row.get(8)?,
+                color: row.get(9)?,
+            })
+        })?;
+
+        Ok(jobs.filter_map(Result::ok).collect())
+    }
+
+    pub fn get_jobs_for_day(&self, day_start_ts: i64, day_end_ts: i64) -> Result<Vec<JobModel>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT
+                id, name, description,
+                def_start_ts, def_end_ts,
+                start_ts, end_ts,
+                proccess_path, cron, color
+            FROM jobs
+            WHERE (start_ts >= ?1 AND start_ts < ?2)
+               OR (end_ts > ?1 AND end_ts <= ?2)
+               OR (start_ts < ?1 AND end_ts > ?2)
+            ORDER BY start_ts ASC
+            "#,
+        )?;
+
+        let jobs = stmt.query_map([day_start_ts, day_end_ts], |row| {
+            let proccess_path_str: String = row.get(7)?;
+            let proccess_path: Vec<Option<i64>> = proccess_path_str
+                .split(',')
+                .filter(|s| !s.is_empty() && s.to_string() != "None")
+                .map(|s| s.trim().parse::<i64>().ok())
+                .collect();
+
+            Ok(JobModel {
+                name: row.get(1)?,
+                description: row.get(2)?,
+                def_start_ts: row.get(3)?,
+                def_end_ts: row.get(4)?,
+                start_ts: row.get(5)?,
+                end_ts: row.get(6)?,
+                proccess_path,
+                cron: row.get(8)?,
+                color: row.get(9)?,
+            })
+        })?;
+
+        Ok(jobs.filter_map(Result::ok).collect())
     }
 
     pub fn insert_events(&mut self, events: &[EventModel]) -> Result<()> {

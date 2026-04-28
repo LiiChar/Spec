@@ -1,6 +1,7 @@
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Job {
+#[allow(dead_code)]
+pub struct JobModel {
     pub name: String,
     pub description: Option<String>,
     pub def_start_ts: Option<i64>,
@@ -12,7 +13,7 @@ pub struct Job {
     pub color: String,
 }
 
-impl Job {
+impl JobModel {
     pub fn new(name: String, start_ts: i64, end_ts: i64, proccess_path: Vec<Option<i64>>) -> Self {
         Self {
             name,
@@ -28,7 +29,7 @@ impl Job {
     }
 }
 
-impl Default for Job {
+impl Default for JobModel {
     fn default() -> Self {
         Self {
             name: "Job".to_string(),

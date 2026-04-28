@@ -5,6 +5,9 @@ const BRIDGE_GAP_MS: u64 = 15_000;
 const NOISE_EVENT_MAX_MS: u64 = 90_000;
 const MIN_STABLE_SEGMENT_MS: u64 = 180_000;
 
+// новое
+const MAX_NOISE_CHAIN: usize = 2;
+
 pub fn merge_events(events: &[EventModel]) -> Vec<EventModel> {
     if events.is_empty() {
         return Vec::new();
@@ -14,13 +17,15 @@ pub fn merge_events(events: &[EventModel]) -> Vec<EventModel> {
     current.sort_by_key(|e| e.timestamp);
 
     loop {
-        let before_len = current.len();
+        let before = current.clone();
 
-        current = merge_adjacent(current);
+        // важно: сначала чистим мусор
         current = merge_bridge_noise(current);
 
-        // если больше ничего не меняется — выходим
-        if current.len() == before_len {
+        // потом склеиваем соседние
+        current = merge_adjacent(current);
+
+        if current == before {
             break;
         }
     }
@@ -53,54 +58,57 @@ fn merge_bridge_noise(events: Vec<EventModel>) -> Vec<EventModel> {
     let mut i = 0;
 
     while i < events.len() {
+        let mut base = events[i].clone();
+        let mut j = i;
+        let mut noise_count = 0;
+
         let mut merged_any = false;
 
-        // пытаемся схлопнуть цепочку, а не только один middle
-        if i + 2 < events.len() {
-            let mut base = events[i].clone();
-            let mut j = i;
+        while j + 2 < events.len() && noise_count < MAX_NOISE_CHAIN {
+            let middle = &events[j + 1];
+            let next = &events[j + 2];
 
-            while j + 2 < events.len() {
-                let middle = &events[j + 1];
-                let next = &events[j + 2];
+            if should_absorb_middle(&base, middle, next) {
+                merge_into(&mut base, middle);
+                merge_into(&mut base, next);
 
-                if should_absorb_middle(&base, middle, next) {
-                    merge_into(&mut base, middle);
-                    merge_into(&mut base, next);
-                    j += 2;
-                    merged_any = true;
-                } else {
-                    break;
-                }
-            }
-
-            if merged_any {
-                result.push(base);
-                i = j + 1;
-                continue;
+                j += 2;
+                noise_count += 1;
+                merged_any = true;
+            } else {
+                break;
             }
         }
 
-        result.push(events[i].clone());
-        i += 1;
+        if merged_any {
+            result.push(base);
+            i = j + 1;
+        } else {
+            result.push(events[i].clone());
+            i += 1;
+        }
     }
 
     result
 }
 
 fn should_absorb_middle(prev: &EventModel, middle: &EventModel, next: &EventModel) -> bool {
+    // края должны совпадать
     if !same_signature(prev, next) {
         return false;
     }
 
+    // middle должен отличаться
     if same_signature(prev, middle) || same_signature(middle, next) {
         return false;
     }
 
+    // слишком длинный шум — не трогаем
     if middle.duration > NOISE_EVENT_MAX_MS {
         return false;
     }
 
+    // оба края слабые → не мержим
     if prev.duration < MIN_STABLE_SEGMENT_MS && next.duration < MIN_STABLE_SEGMENT_MS {
         return false;
     }
@@ -120,7 +128,16 @@ fn can_merge_direct(a: &EventModel, b: &EventModel) -> bool {
         return false;
     }
 
+    // 🔥 новое: защита от overlap
+    if overlaps(a, b) {
+        return true; // пересечения считаем тем же сегментом
+    }
+
     gap(a, b) <= DIRECT_MERGE_GAP_MS
+}
+
+fn overlaps(a: &EventModel, b: &EventModel) -> bool {
+    end_ts(a) > b.timestamp
 }
 
 fn same_signature(a: &EventModel, b: &EventModel) -> bool {

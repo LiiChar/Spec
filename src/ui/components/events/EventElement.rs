@@ -11,7 +11,9 @@ use crate::{
 pub struct EventsElementProps {
     pub events: Vec<EventModel>,
     #[props(default = 0)]
-    pub hour: u32,
+    pub start_hour: u32,
+    #[props(default = 0)]
+    pub end_hour: u32,
     #[props(default = TimelineOrientation::Vertical)]
     pub orientation: TimelineOrientation,
     #[props(default = "".to_string())]
@@ -22,7 +24,10 @@ pub struct EventsElementProps {
 
 #[component]
 pub fn EventElement(props: EventsElementProps) -> Element {
-    let is_current_hour = props.hour == Local::now().hour();
+    let is_current_hour = {
+        let now = Local::now().hour();
+        now >= props.start_hour && now <= props.end_hour
+    };
 
     rsx! {
         div {
@@ -42,14 +47,14 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                 props.class
             ),
             style: match props.orientation {
-                TimelineOrientation::Vertical => format!("height: calc(100%/24);{}", props.style),
+                TimelineOrientation::Vertical => format!("{}", props.style),
                 TimelineOrientation::Horizontal => props.style.clone(),
             },
 
-            span {
-                class: "absolute left-1.5 top-1 text-[10px] z-1 font-semibold opacity-60 pointer-events-none",
-                {format!("{:02}:00", props.hour)}
-            }
+            // span {
+            //     class: "absolute left-1.5 top-1 text-[10px] z-1 font-semibold opacity-60 pointer-events-none",
+            //     {format!("{:02}:00", props.hour)}
+            // }
 
             {props.events.iter().map(|event| {
                 let start_dt = convert_ts_to_local_date(event.timestamp);
@@ -63,8 +68,16 @@ pub fn EventElement(props: EventsElementProps) -> Element {
 
                 let start_sec = start_dt.minute() * 60 + start_dt.second();
                 let duration_sec = event.duration as f32 / 1000.0;
-                let offset = (start_sec as f32 / 3600.0) * 100.0;
-                let size = (duration_sec / 3600.0) * 100.0;
+                let total_hours = (props.end_hour - props.start_hour + 1) as f32;
+                let total_seconds = total_hours * 3600.0;
+
+                let event_start_sec =
+                    (start_dt.hour() - props.start_hour) as f32 * 3600.0 +
+                    start_dt.minute() as f32 * 60.0 +
+                    start_dt.second() as f32;
+
+                let offset = (event_start_sec / total_seconds) * 100.0;
+                let size = (duration_sec / total_seconds) * 100.0;
 
                 let window_info = event.window.as_ref();
                 let process_name = window_info

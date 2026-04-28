@@ -3,10 +3,13 @@ use std::{ops::Add, time::Duration};
 use chrono::{Local, Month, TimeZone, Timelike};
 use dioxus::{desktop::{WindowCloseBehaviour, muda::Icon, use_window}, prelude::*};
 
-use dioxus_free_icons::icons::ld_icons::{LdPlus, LdMinus};
+use dioxus_free_icons::icons::ld_icons::{LdMinus, LdPlus, LdTarget};
 use dioxus_free_icons::Icon;
 
-use crate::ui::{AppContext, EventsCalendar, TimeInput};
+use crate::{config::DATABASE_PATH, core::{JobModel, WindowsDatabase}, ui::{AppContext, EventsCalendar, TimeInput}};
+use crate::{
+    ui::{JobFormModal}
+};
 
 #[component]
 pub fn Header() -> Element {
@@ -72,6 +75,7 @@ pub fn Header() -> Element {
     let close_window = window.clone();
 
     let mut show_calendar = use_signal(|| false);
+    let mut show_job_form = use_signal(|| false);
 
     let mut current_time = use_signal(|| chrono::Local::now().format("%H:%M:%S").to_string());
 
@@ -86,7 +90,7 @@ pub fn Header() -> Element {
 
     rsx! {
         div {
-            class: "fixed top-0 left-0 w-full h-4 flex items-center justify-between px-4 z-50",
+            class: "fixed top-0 left-0 w-full h-3 flex items-center justify-between px-3 z-50",
             
             // Левая часть - Перетаскивание окна
             div {
@@ -97,7 +101,7 @@ pub fn Header() -> Element {
 
             },
             div { 
-                class: "fixed top-2 right-2 flex flex-row items-center z-10 gap-2 header-calendar",
+                class: "fixed top-1.5 right-1 flex flex-row items-center z-10 gap-1 header-calendar",
                 div {
                     onclick: move |evt| {
                         evt.stop_propagation();
@@ -110,7 +114,7 @@ pub fn Header() -> Element {
                     },
                     class: "relative text-sm",
                     div {
-                        class: "cursor-pointer rounded-full  bg-background/20 hover:bg-secondary/20 backdrop-blur-lg border border-border/30 px-2 py-1 text-sm select-none",
+                        class: "cursor-pointer rounded-md bg-secondary/60 hover:bg-secondary/80 border border-border/40 px-2.5 py-1 text-xs font-medium select-none transition-all duration-200 hover:scale-[1.02]",
                         match show_calendar() {
                             true => {
                                 let formatted_date = context.day.read().format("%d.%m.%Y").to_string();
@@ -131,7 +135,7 @@ pub fn Header() -> Element {
                             class: "absolute top-8 right-0 select-none show-left",
                              div { 
                                 
-                                class: "absolute backdrop-blur-lg cursor-pointer -top-[33px] left-0 flex gap-1  flex-row  items-center justify-center h-[30px] rounded-full bg-background/20   border border-border/30 text-sm p-0.5",
+                                class: "absolute backdrop-blur-md cursor-pointer -top-[33px] left-0 flex gap-1  flex-row  items-center justify-center h-[30px] rounded-md bg-secondary/60 border border-border/40 text-xs p-0.5",
                                 div {
                                     onclick: move |evt| {
                                         evt.stop_propagation();
@@ -140,7 +144,7 @@ pub fn Header() -> Element {
                                         context.day.set(cl_day);
                                     },
                                     
-                                    class: "flex items-center justify-center rounded-full hover:bg-secondary/20  h-full w-full p-0.5 aspect-square",
+                                    class: "flex items-center justify-center rounded hover:bg-primary/10 h-full w-full p-1 transition-colors",
                                     "←"
                                 },
                                 div {
@@ -150,7 +154,7 @@ pub fn Header() -> Element {
                                         let cl_day = Local.from_local_datetime(&naive_next_month.and_hms_opt(0, 0, 0).unwrap()).unwrap();
                                         context.day.set(cl_day);
                                     },
-                                    class: "flex items-center justify-center rounded-full hover:bg-secondary/20  h-full w-full p-0.5 aspect-square",
+                                    class: "flex items-center justify-center rounded hover:bg-primary/10 h-full w-full p-1 transition-colors",
                                     "→"
                                 }
                             } 
@@ -163,11 +167,11 @@ pub fn Header() -> Element {
 
                             div { 
                                 
-                                class: "absolute backdrop-blur-lg cursor-pointer -bottom-[33px] left-0 flex gap-1  flex-row  items-center justify-center h-[30px]  w-full",
+                                class: "absolute backdrop-blur-md cursor-pointer -bottom-[33px] left-0 flex gap-1  flex-row  items-center justify-center h-[30px]  w-full",
                                 if *filter_time.read() {
 
                                     div {
-                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 show-left",
+                                        class: "rounded-md bg-secondary/60 border border-border/40 text-xs p-0.5 show-left",
                                         TimeInput { value: time_start.clone() },
                                     }
                                     div { 
@@ -175,26 +179,33 @@ pub fn Header() -> Element {
                                             filter_time.set(false);
                                             start_time.set(None);
                                         },
-                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 aspect-square min-w-[26px] flex items0-center justify-center",
+                                        class: "rounded-md bg-secondary/60 border border-border/40 text-xs p-0.5 aspect-square min-w-[26px] flex items0-center justify-center hover:bg-destructive/20 transition-colors",
                                         Icon { icon: LdMinus }
                                     },
                                     div { 
-                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 show-right",
+                                        class: "rounded-md bg-secondary/60 border border-border/40 text-xs p-0.5 show-right",
                                         TimeInput { value: time_end.clone() },
                                     }
                                 } else {
                                     div { 
                                         onclick: move |_| filter_time.set(true),
-                                        class: "rounded-full bg-background/20   border border-border/30 text-sm p-0.5 aspect-square min-w-[26px] flex items0-center justify-center",
+                                        class: "rounded-md bg-secondary/60 border border-border/40 text-xs p-0.5 aspect-square min-w-[26px] flex items0-center justify-center hover:bg-primary/10 transition-colors",
                                     Icon { icon: LdPlus }
                                     },
                                 }
                             } 
+
+                            div {
+                                onclick: move |_| show_job_form.set(true),
+                                class: "w-[26px] h-[26px] absolute backdrop-blur-md bg-secondary/60 rounded-md flex justify-center items-center cursor-pointer top-0 -right-7  border  border-border/40 aspect-square hover:bg-primary/10 transition-colors",
+                                Icon { icon: LdTarget }
+                            }
+                            
                         }
                     }
                 },
                 button {
-                    class: "w-[30px] h-[30px] border-border aspect-square text-xs rounded-full bg-background/20 backdrop-blur-lg border border-border/30 transition-colors hover:text-white hover:bg-red-600 flex items-center justify-center",
+                    class: "w-[26px] h-[26px]  border-border aspect-square text-xs rounded-md bg-secondary/60 border border-border/40 transition-all hover:bg-destructive/20 flex items-center justify-center hover:scale-105",
                     onclick: move |e: MouseEvent| {
                         e.stop_propagation();
                         close_window.set_close_behavior(WindowCloseBehaviour::WindowHides);
@@ -203,6 +214,19 @@ pub fn Header() -> Element {
                     span {
                         "✕"
                     }
+                }
+            }
+            JobFormModal {
+                visible: show_job_form,
+                start_ts: time.read().clone(),
+                end_ts: time.read().clone() + 3600 * 1000,
+                on_save: move |job: JobModel| {
+                    let _ = WindowsDatabase::new(DATABASE_PATH)
+                    .insert_jobs(&job);
+                show_job_form.set(false);
+                },
+                on_cancel: move |_| {
+                    show_job_form.set(false);
                 }
             }
         }

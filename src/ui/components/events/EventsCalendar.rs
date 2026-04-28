@@ -7,6 +7,7 @@ use crate::core::EventModel;
 
 #[derive(Props, PartialEq, Clone)]
 pub struct EventsCalendarProps {
+    #[props(default = vec![])]
     events: Vec<EventModel>,
     #[props(default = Local::now().date_naive())]
     day: NaiveDate,

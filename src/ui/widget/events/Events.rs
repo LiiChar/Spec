@@ -5,7 +5,7 @@ use dioxus::prelude::*;
 use crate::{
     core::EventModel,
     lib::format_duration_short,
-    ui::{AppContext, ChartType, EventsCharts, EventsList, EventsStats, EventsTimeline, TimelineOrientation},
+    ui::{AppContext, ChartType, EventsCharts, EventsList, EventsStats, EventsTimelineView, TimelineOrientation, JobForm},
 };
 
 #[derive(PartialEq, Clone)]
@@ -19,6 +19,7 @@ pub enum ViewMode {
 pub fn Events() -> Element {
     let context = use_context::<AppContext>();
     let events = context.events;
+    let jobs = context.jobs;
     let mut view_mode: Signal<ViewMode> = use_signal(|| ViewMode::Timeline);
 
     let value = events.clone();
@@ -51,7 +52,7 @@ pub fn Events() -> Element {
                 class: "mb-6 relative",
 
                 div {
-                    class: "fixed top-2 left-2 flex flex-row items-center justify-between rounded-lg bg-secondary/20 backdrop-blur-lg z-10 border border-border/30",
+                    class: "fixed z-100 top-2 left-2 flex flex-row items-center justify-between rounded-lg bg-secondary/20 backdrop-blur-lg z-10 border border-border/30",
 
                     button {
                         class: format!(
@@ -106,8 +107,9 @@ pub fn Events() -> Element {
 
                         div {
                             class: "flex-1 flex",
-                            EventsTimeline {
+                            EventsTimelineView {
                                 events: events.clone(),
+                                jobs: jobs.clone(),
                                 orientation: TimelineOrientation::Vertical,
                                 day: context.day
                             }
