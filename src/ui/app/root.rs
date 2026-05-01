@@ -6,8 +6,8 @@ use crate::{
     core::{with_database, Database, EventModel, JobModel},
     lib::convert_ts_to_local_date,
     ui::{
-        AppProvider, Layout, Page, Router, ToasterProvider, Tray, INITIAL_EVENT_LIMIT,
-        MAX_EVENTS_IN_MEMORY,
+        AppProvider, Layout, Page, Router, SettingsProvider, ToasterProvider, Tray,
+        INITIAL_EVENT_LIMIT, MAX_EVENTS_IN_MEMORY,
     },
     DB, RX,
 };
@@ -18,6 +18,7 @@ const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 #[component]
 pub fn Root() -> Element {
     use_context_provider(|| AppProvider::default());
+    use_context_provider(|| SettingsProvider::default());
     use_context_provider(|| ToasterProvider::default());
 
     let context = use_context::<AppProvider>();

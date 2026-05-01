@@ -24,6 +24,15 @@ where
     f(db)
 }
 
+pub fn with_database_mut<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut Database) -> R,
+{
+    let mut guard = DB.lock().expect("DB");
+    let db = guard.as_mut().expect("Database not initialized");
+    f(db)
+}
+
 impl Database {
     /// Создание + инициализация БД
     pub fn new(path: &str) -> Self {

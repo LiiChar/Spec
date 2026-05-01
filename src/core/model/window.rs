@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::RECT;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rect {
     pub left: i32,
     pub top: i32,
@@ -23,7 +24,7 @@ impl Rect {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WindowModel {
     pub hwnd: isize,
 

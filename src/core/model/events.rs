@@ -1,6 +1,7 @@
 use crate::core::WindowModel;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventType {
     Idle,
     WindowSwitch,
@@ -19,7 +20,7 @@ impl EventType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventModel {
     pub window: Option<WindowModel>,
     pub event_type: EventType,

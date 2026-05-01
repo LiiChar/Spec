@@ -90,7 +90,7 @@ pub fn Tooltip(props: TooltipProps) -> Element {
 
             {props.children}
 
-            
+
         }
         if visible() {
                 div {
