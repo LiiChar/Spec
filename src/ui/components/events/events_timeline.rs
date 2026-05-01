@@ -1,12 +1,18 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Datelike, Duration, Local, Timelike};
-use dioxus::{html::geometry::{Pixels, euclid::Rect}, prelude::*};
-use dioxus_free_icons::icons::ld_icons::{LdPlus};
+use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
+use dioxus::{
+    html::geometry::{euclid::Rect, Pixels},
+    prelude::*,
+};
+use dioxus_free_icons::icons::ld_icons::{LdArrowUpToLine, LdPlus};
 use dioxus_free_icons::Icon;
 
 use crate::{
-    config::DATABASE_PATH, core::{EventModel, JobModel, WindowsDatabase, database::database}, lib::{convert_ts_to_local_date, merge_events}, ui::{EventElement, JobFormModal}
+    config::DATABASE_PATH,
+    core::{database::database, Database, EventModel, JobModel},
+    lib::{convert_ts_to_local_date, merge_events},
+    ui::{EventElement, JobFormModal, JobModal},
 };
 
 #[derive(PartialEq, Clone)]
@@ -61,7 +67,6 @@ fn group_by_hours(events: &[EventModel]) -> HashMap<u32, HashMap<u32, Vec<EventM
     result
 }
 
-
 #[derive(Clone, PartialEq, Debug)]
 struct Segment {
     day: DateTime<Local>,
@@ -85,9 +90,12 @@ fn group_by_segments(events: &[EventModel]) -> Vec<Segment> {
 
         while current < end {
             let next_hour = current
-                .with_minute(0).unwrap()
-                .with_second(0).unwrap()
-                .with_nanosecond(0).unwrap()
+                .with_minute(0)
+                .unwrap()
+                .with_second(0)
+                .unwrap()
+                .with_nanosecond(0)
+                .unwrap()
                 + Duration::hours(1);
 
             let slice_end = if next_hour < end { next_hour } else { end };
@@ -144,10 +152,9 @@ fn group_by_segments(events: &[EventModel]) -> Vec<Segment> {
     for (day, hour, events) in timeline.into_iter().skip(1) {
         let has_events = !events.is_empty();
 
-        let is_same =
-            day == current_day &&
-            hour == current_end + 1 &&
-            (
+        let is_same = day == current_day
+            && hour == current_end + 1
+            && (
                 // объединяем только если ОБА пустые
                 (!has_events && !current_has_events)
             );
@@ -184,11 +191,7 @@ fn group_by_segments(events: &[EventModel]) -> Vec<Segment> {
     segments
 }
 
-fn y_to_timestamp(
-    y: f64,
-    selected_hour: Option<u32>,
-    day_start: u64,
-) -> u64 {
+fn y_to_timestamp(y: f64, selected_hour: Option<u32>, day_start: u64) -> u64 {
     let base = 80.0;
     let expanded = 800.0;
 
@@ -235,29 +238,34 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
     });
 
     let mut selected_hour = use_signal(|| None::<u32>);
+    let mut selected_job = use_signal(|| None::<JobModel>);
 
-    let mut on_mouse_down = use_signal(|| false);
-    let mut start_mouse_position = use_signal(|| (0.0, 0.0));
-    let mut end_mouse_position = use_signal(|| (0.0, 0.0));
-    let mut timeline_height = use_signal(|| 0.0);
-    let mut container_rect = use_signal(|| Rect::zero() as Rect<f64, Pixels>);
-    let mut show_job_form = use_signal(|| false);
-    let mut selected_job_range = use_signal(|| (0i64, 0i64));
+    // let mut on_mouse_down = use_signal(|| false);
+    // let mut start_mouse_position = use_signal(|| (0.0, 0.0));
+    // let mut end_mouse_position = use_signal(|| (0.0, 0.0));
+    // let mut timeline_height = use_signal(|| 0.0);
+    // let mut container_rect = use_signal(|| Rect::zero() as Rect<f64, Pixels>);
+    // let mut show_job_form = use_signal(|| false);
+    // let mut selected_job_range = use_signal(|| (0i64, 0i64));
 
     rsx! {
-        JobFormModal {
-            visible: show_job_form,
-            start_ts: selected_job_range().0,
-            end_ts: selected_job_range().1,
-            on_save: move |job: JobModel| {
-                let _ = WindowsDatabase::new(DATABASE_PATH)
-                    .insert_jobs(&job);
-                show_job_form.set(false);
-            },
-            on_cancel: move |_| {
-                show_job_form.set(false);
-            }
+        JobModal {
+            job: selected_job.read().clone(),
+            on_close: move |_| selected_job.set(None),
         }
+        // JobFormModal {
+        //     visible: show_job_form,
+        //     start_ts: selected_job_range().0,
+        //     end_ts: selected_job_range().1,
+        //     on_save: move |job: JobModel| {
+        //         let _ = Database::new(DATABASE_PATH)
+        //             .insert_jobs(&job);
+        //         show_job_form.set(false);
+        //     },
+        //     on_cancel: move |_| {
+        //         show_job_form.set(false);
+        //     }
+        // }
         div {
             // onmounted: move |e| {
             //     async move {
@@ -290,12 +298,38 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
             //     on_mouse_down.set(false);
             // },
             class: format!(
-                "flex w-full h-full relative rounded-sm overflow-hidden border-border border-[1px] user-select-none {}",
+                "flex w-full h-min relative rounded-md overflow-hidden border border-border/50 bg-card/30 user-select-none {}",
                 match props.orientation {
                     TimelineOrientation::Horizontal => "flex-row",
                     TimelineOrientation::Vertical => "flex-col",
-                }
+                },
             ),
+
+            // Keyboard navigation container
+            div {
+                tabindex: 0,
+                onkeydown: move |evt| {
+                    match evt.key() {
+                        Key::Home => {
+                            evt.prevent_default();
+                            selected_hour.set(Some(0));
+                        }
+                        Key::End => {
+                            evt.prevent_default();
+                            selected_hour.set(Some(23));
+                        }
+                        Key::Escape => {
+                            evt.prevent_default();
+                            selected_hour.set(None);
+                        }
+                        _ => {}
+                    }
+                },
+                onclick: move |_| {},
+                class: "absolute inset-0",
+                role: "application",
+                aria_label: "Таймлайн активности. Используйте стрелки вверх/вниз или k/j для навигации по часам",
+            }
 
             // if on_mouse_down() || end_mouse_position() != start_mouse_position() {
             //     div {
@@ -421,100 +455,127 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
             //     }
             // }
 
+            // {
+            //     props.jobs.read().clone().iter().map(|job| {
+            //         let day_start: i64 = props.day.read()
+            //             .date_naive()
+            //             .and_hms_opt(0, 0, 0)
+            //             .unwrap()
+            //             .and_local_timezone(Local)
+            //             .unwrap()
+            //             .timestamp_millis();
+            //         let job_start = job.start_ts - day_start.clone();
+            //         let job_end = job.end_ts - day_start.clone();
 
+            //         // Calculate position based on 24 hours with base height 80px per hour
+            //         let total_height: f64 = 80.0 * 24.0;
+            //         let hour_height = 80.0;
+
+            //         let start_y = (job_start / 3_600_000) as f64 * hour_height;
+            //         let end_y = (job_end / 3_600_000) as f64 * hour_height;
+            //         let height = (end_y - start_y).max(20.0);
+
+            //         rsx! {
+            //             div {
+            //                 onmousedown: move |evt| evt.stop_propagation(),
+            //                 onmouseup: move |evt| evt.stop_propagation(),
+            //                 class: format!("absolute left-2 right-2 z-10 rounded px-2 py-1 text-white text-xs z-5 flex justify-end"),
+            //                 style: format!("top: {}px; height: {}px; background-color: {}", start_y as i32, height as i32, job.color),
+            //                 div {
+            //                     class: "relative z-40",
+            //                     div {
+            //                         class: "font-medium truncate",
+            //                         "{job.name}"
+            //                     }
+            //                     if let Some(desc) = &job.description {
+            //                         div {
+            //                             class: "text-xs opacity-80 truncate",
+            //                             "{desc}"
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     })
+            // }
             {
-                props.jobs.read().clone().iter().map(|job| {
-                    let day_start: i64 = props.day.read()
-                        .date_naive()
-                        .and_hms_opt(0, 0, 0)
-                        .unwrap()
-                        .and_local_timezone(Local)
-                        .unwrap()
-                        .timestamp_millis();
-                    let job_start = job.start_ts - day_start.clone();
-                    let job_end = job.end_ts - day_start.clone();
-
-                    // Calculate position based on 24 hours with base height 80px per hour
-                    let total_height: f64 = 80.0 * 24.0;
-                    let hour_height = 80.0;
-
-                    let start_y = (job_start / 3_600_000) as f64 * hour_height;
-                    let end_y = (job_end / 3_600_000) as f64 * hour_height;
-                    let height = (end_y - start_y).max(20.0);
-
-                    rsx! {
-                        div {
-                            onmousedown: move |evt| evt.stop_propagation(),
-                            onmouseup: move |evt| evt.stop_propagation(),
-                            class: format!("absolute left-2 right-2 z-10 rounded px-2 py-1 text-white text-xs z-5 flex justify-end"),
-                            style: format!("top: {}px; height: {}px; background-color: {}", start_y as i32, height as i32, job.color),
-                            div {
-                                class: "relative z-40",
-                                div {
-                                    class: "font-medium truncate",
-                                    "{job.name}"
+                day_events
+                    .iter()
+                    .map(|segment| {
+                        let start_hour = segment.start;
+                        let end_hour = segment.end;
+                        let hour_count = (end_hour - start_hour + 1).max(1);
+                        let is_selected = selected_hour()
+                            .map(|h| h >= start_hour && h <= end_hour)
+                            .unwrap_or(false) && hour_count == 1;
+                        let height = if is_selected { 800.0 } else { 80.0 };
+                        let start_ts = props
+                            .day
+                            .read()
+                            .date_naive()
+                            .and_hms_opt(0, 0, 0)
+                            .unwrap()
+                            .and_local_timezone(Local)
+                            .unwrap()
+                            .timestamp_millis();
+                        let jobs = props.jobs.read();
+                        let mut event_jobs: Vec<JobModel> = Vec::new();
+                        jobs
+                        .iter()
+                            .for_each(|job| {
+                                let st_timestamp = start_ts + job.start_ts * 1000 as i64;
+                                let ed_timestamp = start_ts + job.end_ts * 1000 as i64;
+                                let segment_st_timestamp = start_ts
+                                    + start_hour as i64 * 60 * 60 * 1000;
+                                let segment_ed_timestamp = start_ts
+                                    + end_hour as i64 * 60 * 60 * 1000;
+                                if st_timestamp <= segment_ed_timestamp
+                                    && ed_timestamp >= segment_st_timestamp
+                                {
+                                    event_jobs.push(job.clone());
                                 }
-                                if let Some(desc) = &job.description {
-                                    div {
-                                        class: "text-xs opacity-80 truncate",
-                                        "{desc}"
+                            });
+                        rsx! {
+                            div {
+                                class: "relative",
+                                onclick: move |_| selected_hour.set(Some(start_hour)),
+
+                                style: format!("height: {}px;", height as i32),
+
+                                EventElement {
+                                    key: "{start_hour}-{end_hour}",
+                                    class: "h-full border-none!",
+                                    events: segment.group.clone(),
+                                    jobs: event_jobs.clone(),
+                                    selected_job,
+                                    start_hour,
+                                    end_hour,
+                                    orientation: props.orientation.clone(),
+                                    style: format!("height: {}px;", height as i32),
+                                }
+
+                                if is_selected {
+                                    button {
+                                        onclick: move |evt| {
+                                            evt.stop_propagation();
+                                            selected_hour.set(None);
+                                        },
+                                        class: "absolute z-40  border border-border/0 hover:border-border/40 rounded-md p-1 right-1 top-1 hover:bg-background/50 hover:backdrop-blur-lg text-xs opacity-60",
+                                        Icon { icon: LdArrowUpToLine, height: 12, width: 12 }
                                     }
                                 }
-                            }
-                        }
-                    }
-                })
-            }
 
-            {
-                day_events.iter().map(|segment| {
-                    let start_hour = segment.start;
-                    let end_hour = segment.end;
 
-                    let hour_count = (end_hour - start_hour + 1).max(1);
 
-                    let is_selected = selected_hour()
-                        .map(|h| h >= start_hour && h <= end_hour)
-                        .unwrap_or(false);
-
-                    let height = if is_selected && hour_count > 1 {
-                        800.0
-                    } else {
-                        80.0
-                    };
-
-                    rsx! {
-                        div {
-                            class: "relative z-20",
-                            onclick: move |_| selected_hour.set(Some(start_hour)),
-
-                            style: format!("height: {}px;", height as i32),
-
-                            EventElement {
-                                key: "{start_hour}-{end_hour}",
-                                class: "h-full border-none!",
-                                events: segment.group.clone(),
-                                start_hour,
-                                end_hour,
-                                orientation: props.orientation.clone(),
-                                style: format!("height: {}px;", height as i32),
-                            }
-
-                            // подпись диапазона (если сегмент > 1 часа)
-                            if hour_count > 1 {
-                                div {
-                                    class: "absolute left-1 top-1 text-xs opacity-60",
-                                    "{start_hour}-{end_hour}"
-                                }
-                            } else {
-                                div {
-                                    class: "absolute left-1 top-1 text-xs opacity-60",
-                                    "{start_hour}"
+                                // подпись диапазона (если сегмент > 1 часа)
+                                if hour_count > 1 {
+                                    div { class: "absolute left-1 top-1 text-xs opacity-60", "{start_hour}-{end_hour}" }
+                                } else {
+                                    div { class: "absolute left-1 top-1 text-xs opacity-60", "{start_hour}" }
                                 }
                             }
                         }
-                    }
-                })
+                    })
             }
         }
 

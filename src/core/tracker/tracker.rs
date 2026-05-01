@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use windows::Win32::System::SystemInformation::GetTickCount;
 use windows::Win32::UI::Input::KeyboardAndMouse::GetLastInputInfo;
 use windows::Win32::UI::Input::KeyboardAndMouse::LASTINPUTINFO;
 
-use crate::core::{EventModel, EventType, WindowModel, get_current_window};
+use crate::core::{get_current_window, EventModel, EventType, WindowModel};
 use crate::lib::current_ts;
 
 const IDLE_THRESHOLD_SECS: u32 = 60;
@@ -136,7 +136,9 @@ fn is_user_idle(threshold_secs: u32) -> bool {
 }
 
 pub fn start_tracking(tx: Sender<EventModel>, report_interval_ms: u64) {
-    let tracker = Arc::new(Mutex::new(Tracker::new(Duration::from_millis(report_interval_ms))));
+    let tracker = Arc::new(Mutex::new(Tracker::new(Duration::from_millis(
+        report_interval_ms,
+    ))));
     let running = Arc::new(Mutex::new(true));
 
     let t_tracker = tracker.clone();
@@ -170,7 +172,6 @@ pub fn start_tracking(tx: Sender<EventModel>, report_interval_ms: u64) {
 
         let mut tracker = t_tracker.lock().unwrap();
         tracker.finalize(&tx);
-
     });
 }
 
@@ -180,9 +181,7 @@ fn same_activity(a: &Activity, b: &Activity) -> bool {
     }
 
     match (&a.window, &b.window) {
-        (Some(w1), Some(w2)) => {
-            w1.title == w2.title && w1.process_name == w2.process_name
-        }
+        (Some(w1), Some(w2)) => w1.title == w2.title && w1.process_name == w2.process_name,
         (None, None) => true,
         _ => false,
     }

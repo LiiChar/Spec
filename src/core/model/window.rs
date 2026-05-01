@@ -1,6 +1,5 @@
 use windows::Win32::Foundation::RECT;
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rect {
     pub left: i32,
@@ -9,7 +8,7 @@ pub struct Rect {
     pub bottom: i32,
     pub width: i32,
     pub height: i32,
-} 
+}
 
 impl Rect {
     pub fn from_rect(rect: RECT) -> Self {
@@ -22,7 +21,7 @@ impl Rect {
             height: (rect.bottom - rect.top).max(0),
         }
     }
-} 
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WindowModel {

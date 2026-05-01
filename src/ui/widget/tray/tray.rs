@@ -4,7 +4,16 @@ use std::path::Path;
 use dioxus::desktop::use_muda_event_handler;
 use dioxus::prelude::*;
 
-use dioxus::{core::{Element, provide_context}, desktop::{WindowEvent, muda::{Menu, MenuItem}, tao::event::Event, trayicon::{Icon, TrayIconBuilder}, use_wry_event_handler}, prelude::rsx};
+use dioxus::{
+    core::{provide_context, Element},
+    desktop::{
+        muda::{Menu, MenuItem},
+        tao::event::Event,
+        trayicon::{Icon, TrayIconBuilder},
+        use_wry_event_handler, WindowEvent,
+    },
+    prelude::rsx,
+};
 
 const TRAY_ICON: Asset = asset!("/assets/tray_icon.png");
 
@@ -14,7 +23,7 @@ pub fn Tray() -> Element {
     if !Path::new(TRAY_ICON.bundled().absolute_source_path()).exists() {
         return rsx! {
             ""
-        }
+        };
     }
     let icon = load_icon(&Path::new(TRAY_ICON.bundled().absolute_source_path()));
 
@@ -34,20 +43,18 @@ pub fn Tray() -> Element {
 
     provide_context(builder.build().expect("tray icon builder failed"));
 
-    use_muda_event_handler(move |event| {
-        match event.id.0.as_str() {
-            "quit" => {
-                std::process::exit(0);
-            }
-            "toggle" => {
-                let service = dioxus::desktop::window();
-                let window = &service.window;
-
-                let is_visible = window.is_visible();
-                window.set_visible(!is_visible);
-            }
-            _ => {}
+    use_muda_event_handler(move |event| match event.id.0.as_str() {
+        "quit" => {
+            std::process::exit(0);
         }
+        "toggle" => {
+            let service = dioxus::desktop::window();
+            let window = &service.window;
+
+            let is_visible = window.is_visible();
+            window.set_visible(!is_visible);
+        }
+        _ => {}
     });
 
     use_wry_event_handler({

@@ -1,15 +1,26 @@
-use windows::Win32::{Foundation::HWND, Graphics::Gdi::{HMONITOR, MONITOR_DEFAULTTONEAREST, MonitorFromWindow}, System::SystemInformation::GetTickCount, UI::{Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO}, WindowsAndMessaging::{GetClassNameW, GetWindowPlacement, GetWindowTextLengthW, GetWindowTextW, WINDOWPLACEMENT}}};
+use windows::Win32::{
+    Foundation::HWND,
+    Graphics::Gdi::{MonitorFromWindow, HMONITOR, MONITOR_DEFAULTTONEAREST},
+    System::SystemInformation::GetTickCount,
+    UI::{
+        Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO},
+        WindowsAndMessaging::{
+            GetClassNameW, GetWindowPlacement, GetWindowTextLengthW, GetWindowTextW,
+            WINDOWPLACEMENT,
+        },
+    },
+};
 
 pub fn get_class_name(hwnd: HWND) -> String {
     unsafe {
         let mut buf = [0u16; 256];
-        
+
         let len = GetClassNameW(hwnd, &mut buf);
-        
+
         if len == 0 {
             return "unknown".to_string();
         }
-        
+
         String::from_utf16_lossy(&buf[..len as usize])
     }
 }
@@ -30,7 +41,6 @@ pub fn get_idle_time() -> u64 {
     }
 }
 
-
 pub fn get_window_placement(hwnd: HWND) -> WINDOWPLACEMENT {
     unsafe {
         let mut placement = WINDOWPLACEMENT::default();
@@ -40,14 +50,11 @@ pub fn get_window_placement(hwnd: HWND) -> WINDOWPLACEMENT {
             Ok(_) => placement,
             Err(_) => WINDOWPLACEMENT::default(),
         }
-
     }
 }
 
 pub fn get_current_monitor(hwnd: HWND) -> HMONITOR {
-    unsafe {
-        MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
-    }
+    unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) }
 }
 
 pub fn get_window_title(hwnd: HWND) -> String {

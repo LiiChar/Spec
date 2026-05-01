@@ -5,19 +5,22 @@ use dioxus::prelude::*;
 use crate::{
     core::EventModel,
     lib::format_duration_short,
-    ui::{AppContext, ChartType, EventsCharts, EventsList, EventsStats, EventsTimelineView, TimelineOrientation, JobForm},
+    ui::{
+        AppProvider, ChartType, EventsCharts, EventsList, EventsStats, EventsTimelineView, JobForm,
+        Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant, TimelineOrientation,
+    },
 };
 
 #[derive(PartialEq, Clone)]
 pub enum ViewMode {
     Timeline,
     List,
-    Stats
+    Stats,
 }
 
 #[component]
 pub fn Events() -> Element {
-    let context = use_context::<AppContext>();
+    let context = use_context::<AppProvider>();
     let events = context.events;
     let jobs = context.jobs;
     let mut view_mode: Signal<ViewMode> = use_signal(|| ViewMode::Timeline);
@@ -45,140 +48,83 @@ pub fn Events() -> Element {
     let (event_count, total_time, unique_apps, top_apps) = summary();
 
     rsx! {
-        div {
-            class: "flex flex-col gap-0 h-full w-full",
-
-            div {
-                class: "mb-6 relative",
-
-                div {
-                    class: "fixed z-100 top-2 left-2 flex flex-row items-center justify-between rounded-lg bg-secondary/20 backdrop-blur-lg z-10 border border-border/30",
-
-                    button {
-                        class: format!(
-                            "p-1 px-2 rounded-l-lg cursor-pointer {}",
-                            if view_mode() == ViewMode::Timeline {
-                                "bg-background"
-                            } else {
-                                ""
-                            },
-                        ),
-                        onclick: move |_| view_mode.set(ViewMode::Timeline),
-                        "График"
-                    }
-
-                    button {
-                        class: format!(
-                            "p-1 px-2 rounded-r-lg cursor-pointer {}",
-                            if view_mode() == ViewMode::List {
-                                "bg-background"
-                            } else {
-                                ""
-                            },
-                        ),
-                        onclick: move |_| view_mode.set(ViewMode::List),
-                        "Список"
-                    }
-
-                    button {
-                        class: format!(
-                            "p-1 px-2 rounded-r-lg cursor-pointer {}",
-                            if view_mode() == ViewMode::Stats {
-                                "bg-background"
-                            } else {
-                                ""
-                            },
-                        ),
-                        onclick: move |_| view_mode.set(ViewMode::Stats),
-                        "Статистика"
-                    }
+        div { class: "flex flex-col gap-4 h-full w-full -mt-4.5",
+            Tabs {
+                variant: TabsVariant::Rounded,
+                value: "timeline".to_string(),
+                TabsList {
+                    class: "sticky top-2 z-100" ,
+                    TabsTrigger { value: "timeline".to_string(), "График" }
+                    TabsTrigger { value: "statistics".to_string(), "Статистика" }
                 }
-            }
 
-            // EventsCharts {chart: match view_mode() {
-            //     ViewMode::Timeline => ChartType::Timeline,
-            //     ViewMode::List => ChartType::Bar,
-            // }}
+                TabsContent {
+                    value: "timeline".to_string(),
+                    div { class: "flex-1 flex flex-row gap-3 py-1 pt-2",
 
-            match view_mode() {
-                ViewMode::Timeline => rsx! {
-                    div {
-                        class: "flex-1 flex flex-row gap-2 p-2",
-
-                        div {
-                            class: "flex-1 flex",
+                        div { class: "flex-1 flex z-50",
                             EventsTimelineView {
                                 events: events.clone(),
                                 jobs: jobs.clone(),
                                 orientation: TimelineOrientation::Vertical,
-                                day: context.day
+                                day: context.day,
                             }
                         }
 
-                        div {
-                            class: "hidden lg:flex w-80 flex-col gap-3 bg-zinc-900/30 rounded-lg border border-zinc-700/30 p-4",
+                        div { class: "hidden  lg:flex w-72 flex-col gap-3 bg-secondary/40 rounded-lg border border-border/30 p-4 ",
 
-                            div {
-                                class: "grid grid-cols-3 gap-3",
+                            div { class: "grid grid-cols-3 gap-2",
 
-                                div {
-                                    class: "rounded-md bg-zinc-800/40 px-3 py-2",
-                                    div { class: "text-[11px] uppercase tracking-wide text-gray-400", "События" }
-                                    div { class: "text-lg font-bold text-cyan-400", "{event_count}" }
+                                div { class: "rounded-md bg-background/50 px-2 py-2 text-center",
+                                    div { class: "text-[10px] uppercase tracking-wide text-muted-foreground",
+                                        "События"
+                                    }
+                                    div { class: "text-base font-semibold text-primary", "{event_count}" }
                                 }
 
-                                div {
-                                    class: "rounded-md bg-zinc-800/40 px-3 py-2",
-                                    div { class: "text-[11px] uppercase tracking-wide text-gray-400", "Приложения" }
-                                    div { class: "text-lg font-bold text-purple-400", "{unique_apps}" }
+                                div { class: "rounded-md bg-background/50 px-2 py-2 text-center",
+                                    div { class: "text-[10px] uppercase tracking-wide text-muted-foreground",
+                                        "Приложения"
+                                    }
+                                    div { class: "text-base font-semibold text-primary", "{unique_apps}" }
                                 }
 
-                                div {
-                                    class: "rounded-md bg-zinc-800/40 px-3 py-2",
-                                    div { class: "text-[11px] uppercase tracking-wide text-gray-400", "Время" }
-                                    div { class: "text-lg font-bold text-green-400", "{format_duration_short(total_time)}" }
+                                div { class: "rounded-md bg-background/50 px-2 py-2 text-center",
+                                    div { class: "text-[10px] uppercase tracking-wide text-muted-foreground",
+                                        "Время"
+                                    }
+                                    div { class: "text-base font-semibold text-primary",
+                                        "{format_duration_short(total_time)}"
+                                    }
                                 }
                             }
 
-                            div {
-                                class: "flex flex-col gap-3 pt-1",
+                            div { class: "flex flex-col gap-2 pt-2",
 
-                                h3 {
-                                    class: "text-sm font-bold text-cyan-400 uppercase tracking-widest",
+                                h3 { class: "text-xs font-semibold text-foreground uppercase tracking-wider",
                                     "Топ Приложений"
                                 }
 
                                 {top_apps.into_iter().map(|(app, duration)| rsx! {
-                                    div {
-                                        class: "flex flex-row items-center justify-between p-2 bg-zinc-800/40 rounded-md hover:bg-zinc-700/50 transition-colors",
+                                    div { class: "flex flex-row items-center justify-between p-2 bg-background/30 rounded-md hover:bg-background/50 transition-colors cursor-default",
 
-                                        span {
-                                            class: "text-sm font-semibold text-gray-300 truncate",
-                                            "{app}"
-                                        }
+                                        span { class: "text-xs font-medium text-foreground truncate", "{app}" }
 
-                                        span {
-                                            class: "text-sm font-bold text-green-400 whitespace-nowrap ml-2",
+                                        span { class: "text-sm font-bold text-green-400 whitespace-nowrap ml-2",
                                             "{format_duration_short(duration)}"
                                         }
                                     }
-                                })}
+                                })
+                                }
                             }
                         }
                     }
-                },
-                ViewMode::List => rsx! {
-                    div {
-                        class: "flex-1 flex flex-col p-2",
-                        EventsList { events }
-                    }
-                },
-                ViewMode::Stats => rsx! {
-                    div {
-                        class: "flex-1 flex flex-col p-2",
-                        EventsStats {  }
-                    }
-                },
+                }
+
+                TabsContent {
+                    value: "statistics".to_string(),
+                    div { class: "flex-1 flex flex-col pt-2", EventsStats {} }
+                }
             }
         }
     }

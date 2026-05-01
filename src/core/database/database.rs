@@ -3,15 +3,28 @@ use std::time::Duration;
 use rusqlite::{Connection, Result};
 use std::sync::{Arc, Mutex};
 
-use crate::core::{EventModel, EventType, JobModel, Rect, WindowModel};
+use crate::{
+    core::{EventModel, EventType, JobModel, Rect, WindowModel},
+    DB,
+};
 
-pub type Db = Arc<Mutex<WindowsDatabase>>;
+pub type Db = Arc<Mutex<Database>>;
 
-pub struct WindowsDatabase {
+#[derive(Debug)]
+pub struct Database {
     conn: Connection,
 }
 
-impl WindowsDatabase {
+pub fn with_database<F, R>(f: F) -> R
+where
+    F: FnOnce(&Database) -> R,
+{
+    let guard = DB.lock().expect("DB");
+    let db = guard.as_ref().expect("Database not initialized");
+    f(db)
+}
+
+impl Database {
     /// Создание + инициализация БД
     pub fn new(path: &str) -> Self {
         let conn = Connection::open(path).expect("Failed to open DB");
@@ -34,7 +47,7 @@ impl WindowsDatabase {
     }
 
     /// Создание таблиц
-  fn init(&self) -> Result<()> {
+    fn init(&self) -> Result<()> {
         self.conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS window_activity (
@@ -150,8 +163,6 @@ impl WindowsDatabase {
             )?;
         }
 
-
-
         Ok(())
     }
 
@@ -230,7 +241,10 @@ impl WindowsDatabase {
     }
 
     pub fn insert_jobs(&mut self, jobs: &JobModel) -> Result<()> {
-        let process_paths = jobs.proccess_path.iter().fold(String::new(), |acc, e| format!("{acc},{e:?}"));
+        let process_paths = jobs
+            .proccess_path
+            .iter()
+            .fold(String::new(), |acc, e| format!("{acc},{e:?}"));
         self.conn.execute(
             r#"
             INSERT INTO jobs (
@@ -267,7 +281,10 @@ impl WindowsDatabase {
     }
 
     pub fn save_job(&self, job: &JobModel) -> Result<i64> {
-        let process_paths = job.proccess_path.iter().fold(String::new(), |acc, e| format!("{acc},{e:?}"));
+        let process_paths = job
+            .proccess_path
+            .iter()
+            .fold(String::new(), |acc, e| format!("{acc},{e:?}"));
         self.conn.execute(
             r#"
             INSERT INTO jobs (
@@ -297,6 +314,42 @@ impl WindowsDatabase {
                 ":proccess_path": process_paths,
                 ":cron": job.cron,
                 ":color": job.color
+            },
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn update_job(&self, job: &JobModel) -> Result<i64> {
+        let process_paths = job
+            .proccess_path
+            .iter()
+            .fold(String::new(), |acc, e| format!("{acc},{e:?}"));
+        self.conn.execute(
+            r#"
+            UPDATE jobs
+            SET
+                name = :name,
+                description = :description,
+                def_start_ts = :def_start_ts,
+                def_end_ts = :def_end_ts,
+                start_ts = :start_ts,
+                end_ts = :end_ts,
+                proccess_path = :proccess_path,
+                cron = :cron,
+                color = :color
+            WHERE name = :name and start_ts = :start_ts and end_ts = :end_ts
+            "#,
+            rusqlite::named_params! {
+                ":name": job.name,
+                ":description": job.description,
+                ":def_start_ts": job.def_start_ts,
+                ":def_end_ts": job.def_end_ts,
+                ":start_ts": job.start_ts,
+                ":end_ts": job.end_ts,
+                ":proccess_path": process_paths,
+                ":cron": job.cron,
+                ":color": job.color,
             },
         )?;
 
@@ -349,14 +402,11 @@ impl WindowsDatabase {
                 start_ts, end_ts,
                 proccess_path, cron, color
             FROM jobs
-            WHERE (start_ts >= ?1 AND start_ts < ?2)
-               OR (end_ts > ?1 AND end_ts <= ?2)
-               OR (start_ts < ?1 AND end_ts > ?2)
             ORDER BY start_ts ASC
             "#,
         )?;
 
-        let jobs = stmt.query_map([day_start_ts, day_end_ts], |row| {
+        let jobs = stmt.query_map([], |row| {
             let proccess_path_str: String = row.get(7)?;
             let proccess_path: Vec<Option<i64>> = proccess_path_str
                 .split(',')
@@ -510,10 +560,7 @@ impl WindowsDatabase {
         )?;
 
         let rows = stmt.query_map([], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, i64>(1)?,
-            ))
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
         })?;
 
         Ok(rows.filter_map(Result::ok).collect())
@@ -685,9 +732,7 @@ impl WindowsDatabase {
             "#,
         )?;
 
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
-        })?;
+        let rows = stmt.query_map([], |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?)))?;
 
         Ok(rows.filter_map(Result::ok).collect())
     }
@@ -785,32 +830,27 @@ impl WindowsDatabase {
 
     /// Удалить старые события (по временной метке)
     pub fn cleanup_old_events(&self, older_than_ts: i64) -> Result<usize> {
-        let deleted = self.conn.execute(
-            "DELETE FROM events WHERE timestamp < ?1",
-            [older_than_ts],
-        )?;
+        let deleted = self
+            .conn
+            .execute("DELETE FROM events WHERE timestamp < ?1", [older_than_ts])?;
 
         Ok(deleted)
     }
 
     /// Получить количество всех событий
     pub fn get_events_count(&self) -> Result<i64> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM events",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM events", [], |row| row.get(0))?;
 
         Ok(count)
     }
 
     /// Получить количество записей об окнах
     pub fn get_window_records_count(&self) -> Result<i64> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM window_activity",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM window_activity", [], |row| row.get(0))?;
 
         Ok(count)
     }

@@ -1,11 +1,10 @@
-use std::time::{SystemTime};
+use std::time::SystemTime;
 
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use dioxus::desktop::wry::cookie::time::Date;
 
 pub fn current_ts() -> u64 {
-    chrono::prelude::DateTime::<chrono::Utc>::from(SystemTime::now())
-        .timestamp_millis() as u64
+    chrono::prelude::DateTime::<chrono::Utc>::from(SystemTime::now()).timestamp_millis() as u64
 }
 
 pub fn convert_ts_to_date(ts: u64) -> DateTime<Utc> {
@@ -24,16 +23,16 @@ pub fn convert_ts_to_local_date(ts: u64) -> DateTime<Local> {
 /// - 3665000ms -> "1h 1m"
 pub fn format_duration(duration_ms: u64) -> String {
     let total_seconds = duration_ms / 1000;
-    
+
     if total_seconds == 0 {
         return "0s".to_string();
     }
-    
+
     let hours = total_seconds / 3600;
     let remaining_after_hours = total_seconds % 3600;
     let minutes = remaining_after_hours / 60;
     let seconds = remaining_after_hours % 60;
-    
+
     match (hours, minutes, seconds) {
         (h, m, s) if h > 0 => {
             if m > 0 {
@@ -60,19 +59,30 @@ pub fn format_duration(duration_ms: u64) -> String {
 /// - 3665000ms -> "1ч 1м"
 pub fn format_duration_short(duration_ms: u64) -> String {
     let total_seconds = duration_ms / 1000;
-    
+
     if total_seconds == 0 {
         return "0с".to_string();
     }
-    
+
     let hours = total_seconds / 3600;
     let remaining_after_hours = total_seconds % 3600;
     let minutes = remaining_after_hours / 60;
     let seconds = remaining_after_hours % 60;
-    
+
     match (hours, minutes, seconds) {
         (h, m, _) if h > 0 => format!("{}ч {}м", h, m),
         (_, m, s) if m > 0 => format!("{}м {}с", m, s),
         (_, _, s) => format!("{}с", s),
     }
+}
+
+pub fn get_start_day_ts() -> i64 {
+    let now = Local::now();
+    let selected_day = now.date_naive();
+    selected_day
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_local_timezone(Local)
+        .unwrap()
+        .timestamp_millis()
 }

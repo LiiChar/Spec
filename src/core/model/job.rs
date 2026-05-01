@@ -1,6 +1,4 @@
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct JobModel {
     pub name: String,
     pub description: Option<String>,

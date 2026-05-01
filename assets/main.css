@@ -11,32 +11,43 @@
         background-color: var(--background);
         color: var(--foreground);
         box-sizing: border-box;
-        overflow: hidden auto ;
-        transition: all;
+        overflow: hidden auto;
+        transition:
+            background-color 0.3s ease,
+            color 0.3s ease;
     }
-    
-    /* Скрытие скролбара */
-    ::-webkit-scrollbar {
+
+    /* Smooth transitions for interactive elements */
+    button,
+    div[class*="cursor-pointer"] {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: oklch(0.6 0.02 80 / 0.4) transparent;
+    }
+
+    *::-webkit-scrollbar {
         width: 8px;
         height: 8px;
     }
 
-    ::-webkit-scrollbar-track {
+    *::-webkit-scrollbar-track {
         background: transparent;
     }
 
-    ::-webkit-scrollbar-thumb {
-        background: rgba(63, 63, 70, 0.5);
+    *::-webkit-scrollbar-thumb {
+        background: oklch(0.6 0.02 80 / 0.4);
         border-radius: 4px;
     }
 
-    ::-webkit-scrollbar-thumb:hover {
-        background: rgba(63, 63, 70, 0.8);
+    *::-webkit-scrollbar-thumb:hover {
+        background: oklch(0.5 0.02 80 / 0.6);
     }
-    
-    /* Firefox */
+
     * {
-        scrollbar-color: rgba(63, 63, 70, 0.5) transparent;
+        scrollbar-color: rgba(63, 63, 70, 0.4) transparent;
     }
 
     input::-webkit-outer-spin-button,
@@ -46,7 +57,7 @@
     }
 
     /* Firefox */
-    input[type=number] {
+    input[type="number"] {
         -moz-appearance: textfield;
     }
 }
@@ -60,7 +71,8 @@
         }
     }
     .triangle-bottom {
-        width: 0; height: 0;
+        width: 0;
+        height: 0;
         border-style: solid;
         border-color: var(--background) transparent transparent transparent;
         border-width: 12px 6px 0px 6px;
@@ -138,7 +150,7 @@
 
     .fade-in {
         animation: 0.2s ease-in-out forwards;
-    animation-name: fade-in;
+        animation-name: fade-in;
     }
 
     @keyframes fade-out {
@@ -153,9 +165,85 @@
 
     .fade-out {
         animation: 0.2s ease-in-out forwards;
-        
-    animation-name: fade-out;
+
+        animation-name: fade-out;
     }
 
-    
+    /* Timeline hover effects */
+    .timeline-block {
+        transition:
+            transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+            box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .timeline-block:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+
+    /* Current hour indicator */
+    .current-hour {
+        position: relative;
+    }
+
+    .current-hour::before {
+        z-index: 100;
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: var(--primary);
+        border-top-right-radius: 2px;
+        border-bottom-right-radius: 2px;
+    }
+
+    /* Subtle pulse animation for current time */
+    @keyframes pulse-subtle {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    .pulse-subtle {
+        animation: pulse-subtle 2s ease-in-out infinite;
+    }
+
+    /* Smooth scale transition for buttons */
+    .scale-hover:hover {
+        transform: scale(1.05);
+    }
+
+    .scale-hover:active {
+        transform: scale(0.95);
+    }
+
+    /* Card hover effect */
+    .card-hover {
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Focus ring for accessibility */
+    .focus-ring:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+    }
+
+    /* Smooth background transitions */
+    .bg-transition {
+        transition:
+            background-color 0.3s ease,
+            border-color 0.3s ease;
+    }
 }

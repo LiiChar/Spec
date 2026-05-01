@@ -1,1 +1,0 @@
-pub const DATABASE_PATH: &str = "windows.db";

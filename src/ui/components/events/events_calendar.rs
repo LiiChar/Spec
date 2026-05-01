@@ -20,37 +20,37 @@ fn is_today(date: NaiveDate, today: NaiveDate) -> bool {
 }
 
 fn in_month(date: NaiveDate) -> bool {
-    date.month() == Local::now().date_naive().month() && date.year() == Local::now().date_naive().year()
+    date.month() == Local::now().date_naive().month()
+        && date.year() == Local::now().date_naive().year()
 }
 
 pub fn build_month_matrix(date: NaiveDate) -> Vec<Vec<NaiveDate>> {
-  let first_day = date.with_day(1).unwrap();
+    let first_day = date.with_day(1).unwrap();
 
-  // индекс дня недели (0 = Mon ... 6 = Sun)
-  let start_offset = first_day.weekday().num_days_from_monday();
+    // индекс дня недели (0 = Mon ... 6 = Sun)
+    let start_offset = first_day.weekday().num_days_from_monday();
 
-  let mut current = first_day - chrono::Duration::days(start_offset as i64);
+    let mut current = first_day - chrono::Duration::days(start_offset as i64);
 
-  let total_days = start_offset as usize + date.num_days_in_month() as usize;
-  let count_week = (total_days + 6) / 7;
+    let total_days = start_offset as usize + date.num_days_in_month() as usize;
+    let count_week = (total_days + 6) / 7;
 
-  let mut weeks: Vec<Vec<NaiveDate>> = Vec::new();
+    let mut weeks: Vec<Vec<NaiveDate>> = Vec::new();
 
-  // обычно календарь = 5–6 недель
-  for _ in 0..count_week {
-      let mut week = Vec::new();
+    // обычно календарь = 5–6 недель
+    for _ in 0..count_week {
+        let mut week = Vec::new();
 
-      for _ in 0..7 {
-          week.push(current);
-          current = current.succ_opt().unwrap();
-      }
+        for _ in 0..7 {
+            week.push(current);
+            current = current.succ_opt().unwrap();
+        }
 
-      weeks.push(week);
-  }
+        weeks.push(week);
+    }
 
-  weeks
+    weeks
 }
-
 
 #[component]
 pub fn EventsCalendar(props: EventsCalendarProps) -> Element {
@@ -90,6 +90,9 @@ pub fn EventsCalendar(props: EventsCalendarProps) -> Element {
                                 if is_today(date_copy, today) { "bg-foreground text-background! shadow-md" } else { "" },
                                 if Local::now().date_naive() == date_copy { "border-[1px] border-foreground" } else { "" },
                             ),
+                            tabindex: 0,
+                            role: "button",
+                            aria_label: format!("Дата: {}, {}", date_copy.format("%d %B %Y"), if is_today(date_copy, today) { "сегодня" } else { "" }),
                             "{date_copy.day()}"
                         }
                     }
@@ -98,4 +101,4 @@ pub fn EventsCalendar(props: EventsCalendarProps) -> Element {
         })}
       }
     }
-} 
+}

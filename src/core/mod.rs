@@ -1,10 +1,10 @@
-pub mod window;
+pub mod database;
 pub mod model;
 pub mod tracker;
-pub mod database;
 pub mod tray;
+pub mod window;
 
-pub use window::*;
+pub use database::*;
 pub use model::*;
 pub use tracker::*;
-pub use database::*;
+pub use window::*;

@@ -13,8 +13,6 @@ pub struct JobFormModalProps {
     pub on_save: Callback<JobModel>,
     #[props(default = Callback::new(|_| ()))]
     pub on_cancel: Callback<()>,
-    #[props(default = Callback::new(|_| ()))]
-    pub on_close: Callback<()>,
 }
 
 #[component]
@@ -24,15 +22,17 @@ pub fn JobFormModal(props: JobFormModalProps) -> Element {
             div {
                 class: "fixed inset-0 bg-black/50 flex p-4 items-center justify-center z-[200]",
                 onclick: move |_| {
-                    props.on_close.call(());
                     props.on_cancel.call(());
                     props.visible.boxed_mut().set(false);
                 },
                 div {
-                    class: "bg-background p-6 rounded-lg shadow-lg max-w-96 overflow-y-auto",
+                    class: "bg-background p-6 rounded-lg shadow-lg max-w-96 overflow-y-auto relative",
                     onclick: move |evt| evt.stop_propagation(),
-                    div {
-                        class: "absolute top-2 -right-2",
+                    button {
+                        onclick: move |_| {
+                            props.on_cancel.call(());
+                        },
+                        class: "absolute top-3 right-2 hover:bg-destructive rounded-full p-1 transition-colors",
                         Icon {
                             icon: LdX
                         }

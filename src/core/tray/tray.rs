@@ -1,17 +1,15 @@
-
-
 use std::sync::Arc;
 
 use dioxus::{
     desktop::{
         tao::event::Event,
         trayicon::{
-            menu::{Menu, MenuItem, },
+            menu::{Menu, MenuItem},
             Icon, TrayIconBuilder,
         },
         use_tray_menu_event_handler, use_wry_event_handler, WindowEvent,
     },
-    prelude::{provide_context},
+    prelude::provide_context,
 };
 
 pub fn init() {
@@ -35,22 +33,20 @@ pub fn init() {
     provide_context(builder.build().expect("tray icon builder failed"));
 
     {
-        use_tray_menu_event_handler(move |event| {
-            match event.id.0.as_str() {
-                "quit" => {
-                    println!("Quit");
-                    std::process::exit(0);
-                }
-                "toggle" => {
-                    let service = dioxus::desktop::window();
-                    let window = &service.window;
-
-                    let is_visible = window.is_visible();
-
-                    window.set_visible(!is_visible);
-                }
-                _ => {}
+        use_tray_menu_event_handler(move |event| match event.id.0.as_str() {
+            "quit" => {
+                println!("Quit");
+                std::process::exit(0);
             }
+            "toggle" => {
+                let service = dioxus::desktop::window();
+                let window = &service.window;
+
+                let is_visible = window.is_visible();
+
+                window.set_visible(!is_visible);
+            }
+            _ => {}
         });
     }
 

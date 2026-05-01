@@ -1,2 +1,2 @@
-pub mod JobForm;
-pub use JobForm::*;
+pub mod job_form;
+pub use job_form::*;

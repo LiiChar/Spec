@@ -3,7 +3,9 @@ use dioxus::prelude::*;
 
 use crate::{
     core::EventModel,
-    lib::{convert_ts_to_local_date, current_ts, format_duration_short, get_process_color_gradient},
+    lib::{
+        convert_ts_to_local_date, current_ts, format_duration_short, get_process_color_gradient,
+    },
 };
 
 #[component]
@@ -14,7 +16,12 @@ pub fn EventsList(events: ReadSignal<Vec<EventModel>>) -> Element {
 
         let mut apps: Vec<String> = items
             .iter()
-            .filter_map(|event| event.window.as_ref().map(|window| window.process_name.clone()))
+            .filter_map(|event| {
+                event
+                    .window
+                    .as_ref()
+                    .map(|window| window.process_name.clone())
+            })
             .collect();
         apps.sort();
         apps.dedup();
@@ -33,32 +40,32 @@ pub fn EventsList(events: ReadSignal<Vec<EventModel>>) -> Element {
 
     rsx! {
         div {
-            class: "flex flex-col gap-4 w-full h-full",
+            class: "flex flex-col gap-3 w-full h-full",
 
             div {
-                class: "grid grid-cols-3 gap-4 px-4 py-3 bg-zinc-900/50 rounded-lg border border-zinc-700/50 flex-shrink-0",
+                class: "grid grid-cols-3 gap-2 px-3 py-2 bg-secondary/40 rounded-md border border-border/30 flex-shrink-0",
 
                 div {
                     class: "flex flex-col items-center",
-                    span { class: "text-gray-400 text-sm", "События" }
-                    span { class: "text-2xl font-bold text-cyan-400", "{event_count}" }
+                    span { class: "text-muted-foreground text-xs", "События" }
+                    span { class: "text-xl font-semibold text-primary", "{event_count}" }
                 }
 
                 div {
                     class: "flex flex-col items-center",
-                    span { class: "text-gray-400 text-sm", "Приложения" } 
-                    span { class: "text-2xl font-bold text-purple-400", "{app_count}" }
+                    span { class: "text-muted-foreground text-xs", "Приложения" }
+                    span { class: "text-xl font-semibold text-primary", "{app_count}" }
                 }
 
                 div {
                     class: "flex flex-col items-center",
-                    span { class: "text-gray-400 text-sm", "Время" }
-                    span { class: "text-2xl font-bold text-green-400", "{total_formatted}" }
+                    span { class: "text-muted-foreground text-xs", "Время" }
+                    span { class: "text-xl font-semibold text-primary", "{total_formatted}" }
                 }
             }
 
             div {
-                class: "flex flex-col gap-2 flex-1 overflow-auto pr-1",
+                class: "flex flex-col gap-1.5 flex-1 overflow-auto pr-1",
 
                 {recent_events().into_iter().map(|event| {
                     let start_dt = convert_ts_to_local_date(event.timestamp);

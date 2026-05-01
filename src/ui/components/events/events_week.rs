@@ -7,16 +7,14 @@ use crate::{core::EventModel, lib::convert_ts_to_local_date};
 
 #[derive(Props, PartialEq, Clone)]
 pub struct EventsCalendarProps {
-    events: Vec<EventModel>
+    events: Vec<EventModel>,
 }
 
 fn is_today(date: NaiveDate) -> bool {
     date == Local::now().date_naive()
 }
 
-fn group_by_hours(
-    events: &[EventModel],
-) -> HashMap<u32, HashMap<u32, Vec<EventModel>>> {
+fn group_by_hours(events: &[EventModel]) -> HashMap<u32, HashMap<u32, Vec<EventModel>>> {
     let mut result: HashMap<u32, HashMap<u32, Vec<EventModel>>> = HashMap::new();
 
     for e in events {
@@ -47,7 +45,6 @@ fn group_by_hours(
 }
 
 pub fn build_week(date: NaiveDate) -> Vec<NaiveDate> {
-
     let mut current = date - chrono::Duration::days(6);
 
     let mut week = Vec::new();
@@ -59,7 +56,6 @@ pub fn build_week(date: NaiveDate) -> Vec<NaiveDate> {
 
     week
 }
-
 
 #[component]
 pub fn EventsWeek(props: EventsCalendarProps) -> Element {

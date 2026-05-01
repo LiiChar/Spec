@@ -1,9 +1,7 @@
-mod config;
 mod core;
 mod lib;
 mod ui;
 
-use config::*;
 use core::*;
 use ui::*;
 
@@ -17,6 +15,7 @@ use dioxus::{
 use once_cell::sync::Lazy;
 
 static RX: Lazy<Mutex<Option<Receiver<EventModel>>>> = Lazy::new(|| Mutex::new(None));
+static DB: Lazy<Mutex<Option<Database>>> = Lazy::new(|| Mutex::new(None));
 
 const TRACKER_REPORT_INTERVAL_MS: u64 = 5_000;
 const DB_FLUSH_INTERVAL_MS: u64 = 750;
@@ -26,6 +25,8 @@ fn main() {
     dioxus::logger::init(Level::INFO).unwrap();
 
     let window_config = WindowBuilder::new().with_decorations(false);
+    let database = Database::new(DATABASE_PATH);
+    *DB.lock().unwrap() = Some(database);
 
     let (tx_forward, rx_forward) = crossbeam_channel::unbounded::<EventModel>();
     let (tx_db, rx_db) = crossbeam_channel::unbounded::<EventModel>();
@@ -43,7 +44,7 @@ fn main() {
     });
 
     thread::spawn(move || {
-        let mut database = WindowsDatabase::new(DATABASE_PATH);
+        let mut database = Database::new(DATABASE_PATH);
         let mut pending = Vec::with_capacity(DB_BATCH_SIZE);
 
         loop {

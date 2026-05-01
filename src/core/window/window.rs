@@ -1,20 +1,27 @@
-use base64::Engine;
 use base64::engine::general_purpose;
+use base64::Engine;
 use image::{ImageBuffer, Rgba};
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HWND, RECT};
-use windows::Win32::Graphics::Gdi::{BI_RGB, BITMAP, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS, DeleteObject, GetDC, GetDIBits, GetObjectW, HMONITOR, MONITOR_DEFAULTTONEAREST, MonitorFromWindow, ReleaseDC};
+use windows::Win32::Graphics::Gdi::{
+    DeleteObject, GetDC, GetDIBits, GetObjectW, MonitorFromWindow, ReleaseDC, BITMAP, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HMONITOR, MONITOR_DEFAULTTONEAREST,
+};
+use windows::Win32::System::ProcessStatus::K32GetModuleFileNameExW;
 use windows::Win32::System::SystemInformation::GetTickCount;
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
 use windows::Win32::UI::Shell::ExtractIconExW;
-use windows::Win32::UI::WindowsAndMessaging::{
-    DestroyIcon, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindowPlacement, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, HICON, ICONINFO, IsWindowVisible, SW_MINIMIZE, SW_SHOWMAXIMIZED, WINDOWPLACEMENT
-};
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
-use windows::Win32::System::ProcessStatus::K32GetModuleFileNameExW;
-use windows::core::PCWSTR;
+use windows::Win32::UI::WindowsAndMessaging::{
+    DestroyIcon, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindowPlacement,
+    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible, HICON, ICONINFO,
+    SW_MINIMIZE, SW_SHOWMAXIMIZED, WINDOWPLACEMENT,
+};
 
 use crate::core::{Rect, WindowModel};
-use crate::lib::{current_ts, get_class_name, get_current_monitor, get_idle_time, get_window_placement};
+use crate::lib::{
+    current_ts, get_class_name, get_current_monitor, get_idle_time, get_window_placement,
+};
 
 pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
     unsafe {
@@ -85,11 +92,8 @@ unsafe fn get_process_path(pid: u32) -> String {
         OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
     };
 
-    let process = OpenProcess(
-        PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-        false,
-        pid,
-    ).expect("Failed to open process");
+    let process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
+        .expect("Failed to open process");
 
     if process.is_invalid() {
         return String::from("unknown");
@@ -97,11 +101,7 @@ unsafe fn get_process_path(pid: u32) -> String {
 
     let mut buffer: Vec<u16> = vec![0; 260];
 
-    let len = K32GetModuleFileNameExW(
-        Some(process),
-        None,
-        &mut buffer,
-    );
+    let len = K32GetModuleFileNameExW(Some(process), None, &mut buffer);
 
     if len == 0 {
         return String::from("unknown");
@@ -111,14 +111,10 @@ unsafe fn get_process_path(pid: u32) -> String {
 }
 
 unsafe fn get_process_info(pid: u32) -> (String, String) {
-    use windows::Win32::System::Threading::*;
     use windows::Win32::System::ProcessStatus::*;
+    use windows::Win32::System::Threading::*;
 
-    let process = OpenProcess(
-        PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-        false,
-        pid,
-    );
+    let process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid);
 
     let process = match process {
         Ok(p) => p,
@@ -127,11 +123,7 @@ unsafe fn get_process_info(pid: u32) -> (String, String) {
 
     let mut path = vec![0u16; 260];
 
-    let len = K32GetModuleFileNameExW(
-        Some(process),
-        None,
-        &mut path,
-    );
+    let len = K32GetModuleFileNameExW(Some(process), None, &mut path);
 
     let process_path = if len > 0 {
         String::from_utf16_lossy(&path[..len as usize])
@@ -153,13 +145,7 @@ unsafe fn extract_icon_base64(path: &str) -> Option<String> {
 
     let mut large_icon = HICON::default();
 
-    let count = ExtractIconExW(
-        PCWSTR(wide.as_ptr()),
-        0,
-        Some(&mut large_icon),
-        None,
-        1,
-    );
+    let count = ExtractIconExW(PCWSTR(wide.as_ptr()), 0, Some(&mut large_icon), None, 1);
 
     if count == 0 {
         return None;
@@ -214,14 +200,14 @@ unsafe fn extract_icon_base64(path: &str) -> Option<String> {
         chunk.swap(0, 2);
     }
 
-    let img: ImageBuffer<Rgba<u8>, _> =
-        ImageBuffer::from_raw(width, height, buffer)?;
+    let img: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, buffer)?;
 
     let mut png_bytes = Vec::new();
     img.write_to(
         &mut std::io::Cursor::new(&mut png_bytes),
         image::ImageFormat::Png,
-    ).ok()?;
+    )
+    .ok()?;
 
     Some(format!(
         "data:image/png;base64,{}",

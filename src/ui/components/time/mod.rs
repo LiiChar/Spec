@@ -1,3 +1,3 @@
-pub mod TimeInput;
+pub mod time_input;
 
-pub use TimeInput::*;
+pub use time_input::*;
