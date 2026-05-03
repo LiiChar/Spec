@@ -25,7 +25,7 @@ pub fn Navigate() -> Element {
             }
             if visible.read().clone() {
                 div {
-                    class: "absolute -translate-y-[100%] -mt-2 p-1 py-2 -top-0 left-0 flex flex-col gap-2 rounded-lg bg-secondary/40 backdrop-blur-lg show-bottom",
+                    class: "absolute -translate-y-[100%] -mt-2 p-1 py-2 -top-0 left-0 flex flex-col gap-2 rounded-lg bg-secondary/60 backdrop-blur-lg show-bottom",
                     Tooltip { text: "Главная странице", align: TooltipAlign::Left,
                       button {
                           class: format!("w-[20px] h-[20px] cursor-pointer rounded {}", if page() == Page::Main { "stroke-primary shadow-lg relative z-1" } else { "stroke-foreground" }),
@@ -36,16 +36,6 @@ pub fn Navigate() -> Element {
                           Icon { icon: LdHome, class: format!("{}", if page() == Page::Main { "stroke-primary" } else { "stroke-foreground" }) }
                       }
                     },
-                    Tooltip { text: "Настройки", align: TooltipAlign::Left,
-                      button {
-                        class: format!("w-[20px] h-[20px] cursor-pointer rounded {}", if page() == Page::Settings { "stroke-primary shadow-lg relative z-1" } else { "stroke-foreground" }),
-                        onclick: move |_| {
-                          page.set(Page::Settings);
-                          visible.set(false);
-                        },
-                        Icon { icon: LdSettings, class: format!("{}", if page() == Page::Settings { "stroke-primary" } else { "stroke-foreground" }) }
-                      }
-                    },
                     Tooltip { text: "Статистика", align: TooltipAlign::Left,
                       button {
                         class: format!("w-[20px] h-[20px] cursor-pointer rounded {}", if page() == Page::Statistics { "stroke-primary shadow-lg relative z-1" } else { "stroke-foreground" }),
@@ -54,6 +44,16 @@ pub fn Navigate() -> Element {
                           visible.set(false);
                         },
                         Icon { icon: LdAreaChart, class: format!("{}", if page() == Page::Statistics { "stroke-primary" } else { "stroke-foreground" }) }
+                      }
+                    },
+                    Tooltip { text: "Настройки", align: TooltipAlign::Left,
+                      button {
+                        class: format!("w-[20px] h-[20px] cursor-pointer rounded {}", if page() == Page::Settings { "stroke-primary shadow-lg relative z-1" } else { "stroke-foreground" }),
+                        onclick: move |_| {
+                          page.set(Page::Settings);
+                          visible.set(false);
+                        },
+                        Icon { icon: LdSettings, class: format!("{}", if page() == Page::Settings { "stroke-primary" } else { "stroke-foreground" }) }
                       }
                     },
                 }

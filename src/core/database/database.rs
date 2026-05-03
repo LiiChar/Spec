@@ -117,6 +117,17 @@ impl Database {
                 color TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS goals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT,
+                ordering INTEGER NOT NULL,
+                timestamp INTEGER NOT NULL,
+                start_period_ts INTEGER NOT NULL,
+                end_period_ts INTEGER NOT NULL,
+                process TEXT NOT NULL,
+                completed BOOLEAN NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_window_time
             ON window_activity(timestamp);
 
@@ -588,7 +599,7 @@ impl Database {
     pub fn get_all_events(&self) -> Result<Vec<EventModel>> {
         let mut stmt = self.conn.prepare(
             r#"
-            SELECT 
+            SELECT
                 w.hwnd, w.title, w.class_name,
                 w.process_name, w.process_path, w.pid,
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
@@ -610,7 +621,7 @@ impl Database {
     pub fn get_events_in_range(&self, from_ts: i64, to_ts: i64) -> Result<Vec<EventModel>> {
         let mut stmt = self.conn.prepare(
             r#"
-            SELECT 
+            SELECT
                 w.hwnd, w.title, w.class_name,
                 w.process_name, w.process_path, w.pid,
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
@@ -634,7 +645,7 @@ impl Database {
         let type_i32 = event_type.as_i32();
         let mut stmt = self.conn.prepare(
             r#"
-            SELECT 
+            SELECT
                 w.hwnd, w.title, w.class_name,
                 w.process_name, w.process_path, w.pid,
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
@@ -657,7 +668,7 @@ impl Database {
     pub fn get_events_by_process(&self, process_name: &str) -> Result<Vec<EventModel>> {
         let mut stmt = self.conn.prepare(
             r#"
-            SELECT 
+            SELECT
                 w.hwnd, w.title, w.class_name,
                 w.process_name, w.process_path, w.pid,
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
@@ -750,7 +761,7 @@ impl Database {
     pub fn get_latest_events(&self, limit: i64) -> Result<Vec<EventModel>> {
         let mut stmt = self.conn.prepare(
             r#"
-            SELECT 
+            SELECT
                 w.hwnd, w.title, w.class_name,
                 w.process_name, w.process_path, w.pid,
                 w.left, w.top, w.right, w.bottom, w.width, w.height,

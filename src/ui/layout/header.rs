@@ -9,7 +9,7 @@ use dioxus::{
 use dioxus_free_icons::icons::ld_icons::{LdMinus, LdPlus, LdTarget};
 use dioxus_free_icons::Icon;
 
-use crate::ui::JobFormModal;
+use crate::ui::{JobFormModal, ToasterProvider};
 use crate::{
     config::DATABASE_PATH,
     core::{with_database, Database, JobModel},
@@ -19,6 +19,8 @@ use crate::{
 #[component]
 pub fn Header() -> Element {
     let window = use_window();
+
+    let mut toast = use_context::<ToasterProvider>();
 
     let mut context = use_context::<AppProvider>();
     let events = context.events;
@@ -300,11 +302,14 @@ pub fn Header() -> Element {
                         }).await;
 
                         match result {
-                            Ok(Ok(id)) => println!("Saved job id: {}", id),
+                            Ok(Ok(id)) => {
+                                println!("Saved job id: {}", id)
+                            },
                             Ok(Err(e)) => println!("DB error: {:?}", e),
                             Err(e) => println!("Task error: {:?}", e),
                         }
                     });
+                    toast.success("Задача успешно создана".to_string(), None, None);
                 },
                 on_cancel: move |_| {
                     show_job_form.set(false);

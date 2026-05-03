@@ -53,7 +53,7 @@ pub fn Tooltip(props: TooltipProps) -> Element {
 
     rsx! {
         div {
-            class: "w-full h-full",
+            class: "relative w-full h-full",
             onmouseenter: move |_| {
                 spawn(async move {
                         sleep(TOOLTIP_HIDE_DELAY).await;
@@ -90,18 +90,16 @@ pub fn Tooltip(props: TooltipProps) -> Element {
 
             {props.children}
 
-
-        }
-        if visible() {
+            if visible() {
                 div {
                     role: "tooltip",
-                    class: "absolute pointer-events-none whitespace-nowrap rounded-md border border-border/40 bg-secondary/50 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class} {props.class}",
+                    class: "absolute pointer-events-none whitespace-nowrap rounded-md border backdrop-blur-md border-border/40 bg-secondary/50 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class} {props.class}",
                     style: match props.at_cursor {
                         true => format!("position: fixed; left: {}px; top: {}px; z-index: 2147483647;", position()[0], position()[1]),
                         false => "z-index: 2147483647;".to_string(),
                     },
                     {
-                        match props.target {
+                        match props.target.clone() {
                             Some(target) => target,
                             None => {
                                 rsx! {
@@ -112,5 +110,7 @@ pub fn Tooltip(props: TooltipProps) -> Element {
                     }
                 }
             }
+        }
+
     }
 }
