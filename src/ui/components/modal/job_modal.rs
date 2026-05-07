@@ -4,9 +4,9 @@ use dioxus_free_icons::icons::ld_icons::LdX;
 use dioxus_free_icons::Icon;
 
 use crate::{
-    core::{with_database_mut, JobModel},
+    core::{JobModel, with_database_mut},
     lib::convert_ts_to_local_date,
-    ui::JobForm,
+    ui::{JobForm, use_app},
 };
 
 fn job_anchor_day(job: &JobModel) -> NaiveDate {
@@ -23,6 +23,13 @@ pub struct JobModalProps {
 
 #[component]
 pub fn JobModal(props: JobModalProps) -> Element {
+
+    let app = use_app();
+
+    let update = move |job: JobModel| {
+        app.update_jobs(job);
+    };
+
     rsx! {
         if let Some(job) = props.job {
             div {
@@ -52,19 +59,10 @@ pub fn JobModal(props: JobModalProps) -> Element {
                         end_ts: job.end_ts,
                         start_ts: job.start_ts,
                         on_save: move |job: JobModel| {
-                            spawn(async move {
-                                let result =
-                                    tokio::task::spawn_blocking(move || with_database_mut(|db| db.update_job(&job)))
-                                        .await;
-
-                                match result {
-                                    Ok(Ok(())) => println!("Job updated"),
-                                    Ok(Err(e)) => println!("DB error: {:?}", e),
-                                    Err(e) => println!("Task error: {:?}", e),
-                                }
-                            });
+                            update(job.clone());
+                            props.on_close.call(());
                         },
-                        on_cancel: |_| (),
+                        on_cancel: move |_| props.on_close.call(()),
                       }
                     }
                   }

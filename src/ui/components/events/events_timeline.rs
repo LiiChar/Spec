@@ -353,6 +353,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                     end_hour,
                                     orientation: props.orientation.clone(),
                                     style: format!("height: {}px;", height as i32),
+                                    is_selected: is_selected.clone(),
                                 }
 
                                 if is_selected {

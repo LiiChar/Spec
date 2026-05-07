@@ -26,6 +26,8 @@ pub struct EventsElementProps {
     pub class: String,
     #[props(default = "".to_string())]
     pub style: String,
+    #[props(default = false)]
+    pub is_selected: bool,
 }
 
 pub fn sort_by_duration(a: &JobModel, b: &JobModel) -> Ordering {
@@ -182,47 +184,72 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                     .iter()
                     .map(|event| {
                         let start_dt = convert_ts_to_local_date(event.timestamp);
-                        let end_dt = start_dt
-                            + chrono::Duration::milliseconds(event.duration as i64);
+                        let end_dt = start_dt + chrono::Duration::milliseconds(event.duration as i64);
+
                         let time_range = format!(
                             "{} - {}",
                             start_dt.format("%H:%M:%S"),
                             end_dt.format("%H:%M:%S"),
                         );
+
                         let duration_formatted = format_duration_short(event.duration);
-                        let start_sec = start_dt.minute() * 60 + start_dt.second();
+
                         let duration_sec = event.duration as f32 / 1000.0;
                         let total_hours = (props.end_hour - props.start_hour + 1) as f32;
                         let total_seconds = total_hours * 3600.0;
-                        let event_start_sec = (start_dt.hour() - props.start_hour) as f32
-                            * 3600.0 + start_dt.minute() as f32 * 60.0
+
+                        let event_start_sec = (start_dt.hour() - props.start_hour) as f32 * 3600.0
+                            + start_dt.minute() as f32 * 60.0
                             + start_dt.second() as f32;
+
                         let offset = (event_start_sec / total_seconds) * 100.0;
                         let size = (duration_sec / total_seconds) * 100.0;
+
                         let window_info = event.window.as_ref();
+
                         let process_name = window_info
                             .map(|window| window.process_name.clone())
                             .unwrap_or_else(|| "Unknown".to_string());
+
                         let short_process_name: String = process_name.chars().take(10).collect();
+
                         let window_title = window_info
                             .map(|window| window.title.clone())
                             .unwrap_or_else(|| "N/A".to_string());
+
                         let pid_str = window_info
                             .map(|window| window.pid.to_string())
                             .unwrap_or_else(|| "0".to_string());
+
                         let mut color = get_process_color(&process_name).to_owned();
+
                         if matches!(event.event_type, EventType::Idle) {
                             color += "/50";
                         }
-                        let main_label = if size >= 10.0 {
+
+                        // размер дорожки в пикселях
+                        let track_px = match props.orientation {
+                            TimelineOrientation::Vertical => if props.is_selected { 800.0 } else { 80.0 },
+                            TimelineOrientation::Horizontal => if props.is_selected { 800.0 } else { 80.0 },
+                        };
+
+                        // фактический размер события в пикселях
+                        let event_px = (size / 100.0) * track_px;
+
+                        const SHORT_LABEL_MIN_PX: f32 = 9.0;
+                        const FULL_LABEL_MIN_PX: f32 = 9.0;
+                        const DURATION_MIN_PX: f32 = 9.0;
+
+                        let main_label = if event_px >= FULL_LABEL_MIN_PX {
                             Some(process_name.clone())
-                        } else if size >= 4.0 {
+                        } else if event_px >= SHORT_LABEL_MIN_PX {
                             Some(short_process_name)
                         } else {
                             None
                         };
+
                         let has_main_label = main_label.is_some();
-                        let show_duration = size >= 6.0;
+                        let show_duration = event_px >= DURATION_MIN_PX;
                         rsx! {
                             div {
                                 key: "{event.timestamp}-{event.duration}-{pid_str}",
@@ -257,7 +284,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                 }
 
                                 if main_label.is_some() || show_duration {
-                                    div { class: "absolute inset-0 flex flex-row gap-2 items-center justify-center text-center pointer-events-none",
+                                    div { class: "absolute inset-0 flex flex-row gap-2  items-center justify-center text-center pointer-events-none",
 
                                         if let Some(label) = main_label {
                                             span { class: if size >= 10.0 { "max-w-full truncate whitespace-nowrap text-[10px] font-semibold text-white/90 leading-none" } else { "max-w-full truncate whitespace-nowrap text-[9px] font-medium text-white/85 leading-none" },
@@ -269,8 +296,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                             div { "-" }
                                             span {
                                                 class: format!(
-                                                    "max-w-full truncate whitespace-nowrap leading-none text-white/80 {}",
-                                                    if has_main_label { "mt-0.5 text-[8px]" } else { "text-[9px] font-semibold" },
+                                                    "max-w-full truncate whitespace-nowrap text-[8px] leading-none text-white/80",
                                                 ),
                                                 "{duration_formatted}"
                                             }
