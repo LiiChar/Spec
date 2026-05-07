@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{Local, Timelike};
 use dioxus::prelude::*;
 
-use crate::{core::EventModel, ui::AppProvider};
+use crate::{core::EventModel, ui::{AppProvider, use_app}};
 
 #[derive(PartialEq, Clone)]
 pub enum ChartType {
@@ -27,7 +27,7 @@ fn get_color(index: usize) -> &'static str {
 
 #[component]
 pub fn EventsCharts(props: EventsChartsProps) -> Element {
-    let context = use_context::<AppProvider>();
+    let context = use_app();
     let events = context.events;
 
     let value = events.clone();

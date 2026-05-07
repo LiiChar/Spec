@@ -4,8 +4,7 @@ use rusqlite::{Connection, Result};
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    core::{EventModel, EventType, JobModel, Rect, WindowModel},
-    DB,
+    DB, core::{EventModel, EventType, GoalModel, GoalOrder, JobModel, MIGRATIONS, Rect, TagModel, WindowModel}
 };
 
 pub type Db = Arc<Mutex<Database>>;
@@ -36,9 +35,11 @@ where
 impl Database {
     /// Создание + инициализация БД
     pub fn new(path: &str) -> Self {
-        let conn = Connection::open(path).expect("Failed to open DB");
+        let mut conn = Connection::open(path).expect("Failed to open DB");
+
         conn.busy_timeout(Duration::from_secs(5))
             .expect("Failed to configure DB busy timeout");
+
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -49,7 +50,11 @@ impl Database {
         )
         .expect("Failed to configure DB pragmas");
 
+        MIGRATIONS.to_latest(&mut conn)
+            .expect("Failed to run migrations");
+
         let db = Self { conn };
+
         db.init().expect("Failed to init DB");
 
         db
@@ -90,7 +95,6 @@ impl Database {
                 timestamp INTEGER NOT NULL
             );
 
-            -- 👇 НОВАЯ ТАБЛИЦА
             CREATE TABLE IF NOT EXISTS events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -113,32 +117,96 @@ impl Database {
                 start_ts INTEGER NOT NULL,
                 end_ts INTEGER NOT NULL,
                 proccess_path TEXT,
+                tags TEXT,
                 cron TEXT,
                 color TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS goals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                name TEXT NOT NULL DEFAULT '',
                 description TEXT,
                 ordering INTEGER NOT NULL,
                 timestamp INTEGER NOT NULL,
                 start_period_ts INTEGER NOT NULL,
                 end_period_ts INTEGER NOT NULL,
                 process TEXT NOT NULL,
+                tags TEXT,
                 completed BOOLEAN NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS tag (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                color TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS tag_to_window (
+                tag_id INTEGER NOT NULL,
+                process_name INTEGER NOT NULL,
+                FOREIGN KEY(tag_id) REFERENCES tag(id),
+                FOREIGN KEY(process_name) REFERENCES window_activity(process_name)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_window_time
-            ON window_activity(timestamp);
+                ON window_activity(timestamp);
 
             CREATE INDEX IF NOT EXISTS idx_events_time
-            ON events(timestamp);
+                ON events(timestamp);
 
             CREATE INDEX IF NOT EXISTS idx_events_type
-            ON events(event_type);
+                ON events(event_type);
             "#,
         )?;
 
+        self.migrate_events_window_activity_nullable()?;
+
+        self.ensure_column(
+            "jobs",
+            "tags",
+            "ALTER TABLE jobs ADD COLUMN tags TEXT",
+        )?;
+
+        self.ensure_column(
+            "goals",
+            "tags",
+            "ALTER TABLE goals ADD COLUMN tags TEXT",
+        )?;
+
+        self.ensure_column(
+            "goals",
+            "name",
+            "ALTER TABLE goals ADD COLUMN name TEXT NOT NULL DEFAULT ''",
+        )?;
+
+        Ok(())
+    }
+
+    fn ensure_column(
+        &self,
+        table: &str,
+        column: &str,
+        sql: &str,
+    ) -> Result<()> {
+        let mut stmt = self
+            .conn
+            .prepare(&format!("PRAGMA table_info({})", table))?;
+
+        let cols = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .filter_map(std::result::Result::ok)
+            .collect::<Vec<_>>();
+
+        if !cols.iter().any(|c| c == column) {
+            self.conn.execute(sql, [])?;
+        }
+
+        Ok(())
+    }
+
+    fn migrate_events_window_activity_nullable(&self) -> Result<()> {
         let mut stmt = self.conn.prepare("PRAGMA table_info(events)")?;
         let mut needs_migration = false;
 
@@ -171,11 +239,15 @@ impl Database {
                 );
 
                 INSERT INTO events (id, window_activity_id, event_type, timestamp, duration)
-                SELECT id,
-                       CASE WHEN window_activity_id = -1 THEN NULL ELSE window_activity_id END,
-                       event_type,
-                       timestamp,
-                       duration
+                SELECT
+                    id,
+                    CASE
+                        WHEN window_activity_id = -1 THEN NULL
+                        ELSE window_activity_id
+                    END,
+                    event_type,
+                    timestamp,
+                    duration
                 FROM events_old;
 
                 DROP TABLE events_old;
@@ -183,6 +255,130 @@ impl Database {
             )?;
         }
 
+        Ok(())
+    }
+
+    fn tags_json(tags: &[TagModel]) -> String {
+        serde_json::to_string(tags).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    fn parse_tags_json(raw: Option<String>) -> Vec<TagModel> {
+        raw.and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn merge_tags(&mut self, tags: &[TagModel]) -> Result<usize> {
+        let mut inserted = 0;
+        for t in tags {
+            let exists: bool = self.conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM tag WHERE name = ?1)",
+                [&t.name],
+                |row| row.get(0),
+            )?;
+            if !exists {
+                self.conn.execute(
+                    "INSERT INTO tag (name, description, color) VALUES (?1, ?2, ?3)",
+                    (&t.name, &t.description, &t.color),
+                )?;
+                inserted += 1;
+            }
+        }
+        Ok(inserted)
+    }
+
+    pub fn get_goals(&self) -> Result<Vec<GoalModel>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT
+                id, name, description, ordering, timestamp,
+                start_period_ts, end_period_ts, process, tags, completed
+            FROM goals
+            ORDER BY timestamp DESC
+            "#,
+        )?;
+
+        let goals = stmt.query_map([], |row| {
+            let tags_raw: Option<String> = row.get(8)?;
+            Ok(GoalModel {
+                id: Some(row.get(0)?),
+                name: row.get(1)?,
+                description: row.get(2)?,
+                ordering: GoalOrder::from_i32(row.get(3)?),
+                timestamp: row.get(4)?,
+                start_period_ts: row.get(5)?,
+                end_period_ts: row.get(6)?,
+                process: row.get(7)?,
+                tags: Self::parse_tags_json(tags_raw),
+                completed: row.get::<_, i32>(9)? != 0,
+            })
+        })?;
+
+        Ok(goals.filter_map(std::result::Result::ok).collect())
+    }
+
+    pub fn insert_goal(&mut self, goal: &GoalModel) -> Result<i64> {
+        let tags = Self::tags_json(&goal.tags);
+        self.conn.execute(
+            r#"
+            INSERT INTO goals (
+                name, description, ordering, timestamp,
+                start_period_ts, end_period_ts, process, tags, completed
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "#,
+            (
+                &goal.name,
+                &goal.description,
+                goal.ordering.as_i32(),
+                goal.timestamp,
+                goal.start_period_ts,
+                goal.end_period_ts,
+                &goal.process,
+                tags,
+                goal.completed as i32,
+            ),
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn update_goal(&self, goal: &GoalModel) -> Result<()> {
+        let Some(id) = goal.id else {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        };
+        let tags = Self::tags_json(&goal.tags);
+        self.conn.execute(
+            r#"
+            UPDATE goals SET
+                name = ?1,
+                description = ?2,
+                ordering = ?3,
+                timestamp = ?4,
+                start_period_ts = ?5,
+                end_period_ts = ?6,
+                process = ?7,
+                tags = ?8,
+                completed = ?9
+            WHERE id = ?10
+            "#,
+            (
+                &goal.name,
+                &goal.description,
+                goal.ordering.as_i32(),
+                goal.timestamp,
+                goal.start_period_ts,
+                goal.end_period_ts,
+                &goal.process,
+                tags,
+                goal.completed as i32,
+                id,
+            ),
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_goal(&self, id: i64) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM goals WHERE id = ?1", [id])?;
         Ok(())
     }
 
@@ -265,6 +461,7 @@ impl Database {
             .proccess_path
             .iter()
             .fold(String::new(), |acc, e| format!("{acc},{e:?}"));
+        let tags = Self::tags_json(&jobs.tags);
         self.conn.execute(
             r#"
             INSERT INTO jobs (
@@ -275,13 +472,14 @@ impl Database {
                 start_ts,
                 end_ts,
                 proccess_path,
+                tags,
                 cron,
                 color
             )
             VALUES (
                 :name, :description, :def_start_ts,
                 :def_end_ts, :start_ts, :end_ts,
-                :proccess_path, :cron, :color
+                :proccess_path, :tags, :cron, :color
             )
             "#,
             rusqlite::named_params! {
@@ -292,6 +490,7 @@ impl Database {
                 ":start_ts": jobs.start_ts,
                 ":end_ts": jobs.end_ts,
                 ":proccess_path": process_paths,
+                ":tags": tags,
                 ":cron": jobs.cron,
                 ":color": jobs.color
             },
@@ -300,11 +499,12 @@ impl Database {
         Ok(())
     }
 
-    pub fn save_job(&self, job: &JobModel) -> Result<i64> {
+    pub fn save_job(&mut self, job: &JobModel) -> Result<i64> {
         let process_paths = job
             .proccess_path
             .iter()
             .fold(String::new(), |acc, e| format!("{acc},{e:?}"));
+        let tags = Self::tags_json(&job.tags);
         self.conn.execute(
             r#"
             INSERT INTO jobs (
@@ -315,13 +515,14 @@ impl Database {
                 start_ts,
                 end_ts,
                 proccess_path,
+                tags,
                 cron,
                 color
             )
             VALUES (
                 :name, :description, :def_start_ts,
                 :def_end_ts, :start_ts, :end_ts,
-                :proccess_path, :cron, :color
+                :proccess_path, :tags, :cron, :color
             )
             "#,
             rusqlite::named_params! {
@@ -332,6 +533,7 @@ impl Database {
                 ":start_ts": job.start_ts,
                 ":end_ts": job.end_ts,
                 ":proccess_path": process_paths,
+                ":tags": tags,
                 ":cron": job.cron,
                 ":color": job.color
             },
@@ -340,40 +542,83 @@ impl Database {
         Ok(self.conn.last_insert_rowid())
     }
 
-    pub fn update_job(&self, job: &JobModel) -> Result<i64> {
+    pub fn update_job(&self, job: &JobModel) -> Result<()> {
         let process_paths = job
             .proccess_path
             .iter()
             .fold(String::new(), |acc, e| format!("{acc},{e:?}"));
-        self.conn.execute(
-            r#"
-            UPDATE jobs
-            SET
-                name = :name,
-                description = :description,
-                def_start_ts = :def_start_ts,
-                def_end_ts = :def_end_ts,
-                start_ts = :start_ts,
-                end_ts = :end_ts,
-                proccess_path = :proccess_path,
-                cron = :cron,
-                color = :color
-            WHERE name = :name and start_ts = :start_ts and end_ts = :end_ts
-            "#,
-            rusqlite::named_params! {
-                ":name": job.name,
-                ":description": job.description,
-                ":def_start_ts": job.def_start_ts,
-                ":def_end_ts": job.def_end_ts,
-                ":start_ts": job.start_ts,
-                ":end_ts": job.end_ts,
-                ":proccess_path": process_paths,
-                ":cron": job.cron,
-                ":color": job.color,
-            },
-        )?;
+        let tags = Self::tags_json(&job.tags);
+        let rows = if let Some(id) = job.id {
+            self.conn.execute(
+                r#"
+                UPDATE jobs
+                SET
+                    name = :name,
+                    description = :description,
+                    def_start_ts = :def_start_ts,
+                    def_end_ts = :def_end_ts,
+                    start_ts = :start_ts,
+                    end_ts = :end_ts,
+                    proccess_path = :proccess_path,
+                    tags = :tags,
+                    cron = :cron,
+                    color = :color
+                WHERE id = :id
+                "#,
+                rusqlite::named_params! {
+                    ":name": job.name,
+                    ":description": job.description,
+                    ":def_start_ts": job.def_start_ts,
+                    ":def_end_ts": job.def_end_ts,
+                    ":start_ts": job.start_ts,
+                    ":end_ts": job.end_ts,
+                    ":proccess_path": process_paths,
+                    ":tags": tags,
+                    ":cron": job.cron,
+                    ":color": job.color,
+                    ":id": id,
+                },
+            )?
+        } else {
+            self.conn.execute(
+                r#"
+                UPDATE jobs
+                SET
+                    name = :name,
+                    description = :description,
+                    def_start_ts = :def_start_ts,
+                    def_end_ts = :def_end_ts,
+                    start_ts = :start_ts,
+                    end_ts = :end_ts,
+                    proccess_path = :proccess_path,
+                    tags = :tags,
+                    cron = :cron,
+                    color = :color
+                WHERE name = :name_match AND start_ts = :start_ts_match AND end_ts = :end_ts_match
+                "#,
+                rusqlite::named_params! {
+                    ":name": job.name,
+                    ":description": job.description,
+                    ":def_start_ts": job.def_start_ts,
+                    ":def_end_ts": job.def_end_ts,
+                    ":start_ts": job.start_ts,
+                    ":end_ts": job.end_ts,
+                    ":proccess_path": process_paths,
+                    ":tags": tags,
+                    ":cron": job.cron,
+                    ":color": job.color,
+                    ":name_match": job.name,
+                    ":start_ts_match": job.start_ts,
+                    ":end_ts_match": job.end_ts,
+                },
+            )?
+        };
 
-        Ok(self.conn.last_insert_rowid())
+        if rows == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+
+        Ok(())
     }
 
     pub fn get_jobs(&self) -> Result<Vec<JobModel>> {
@@ -383,7 +628,7 @@ impl Database {
                 id, name, description,
                 def_start_ts, def_end_ts,
                 start_ts, end_ts,
-                proccess_path, cron, color
+                proccess_path, tags, cron, color
             FROM jobs
             ORDER BY start_ts DESC
             "#,
@@ -393,11 +638,13 @@ impl Database {
             let proccess_path_str: String = row.get(7)?;
             let proccess_path: Vec<Option<i64>> = proccess_path_str
                 .split(',')
-                .filter(|s| !s.is_empty() && s.to_string() != "None")
+                .filter(|s| !s.is_empty() && *s != "None")
                 .map(|s| s.trim().parse::<i64>().ok())
                 .collect();
+            let tags_raw: Option<String> = row.get(8)?;
 
             Ok(JobModel {
+                id: Some(row.get(0)?),
                 name: row.get(1)?,
                 description: row.get(2)?,
                 def_start_ts: row.get(3)?,
@@ -405,22 +652,23 @@ impl Database {
                 start_ts: row.get(5)?,
                 end_ts: row.get(6)?,
                 proccess_path,
-                cron: row.get(8)?,
-                color: row.get(9)?,
+                tags: Self::parse_tags_json(tags_raw),
+                cron: row.get(9)?,
+                color: row.get(10)?,
             })
         })?;
 
         Ok(jobs.filter_map(Result::ok).collect())
     }
 
-    pub fn get_jobs_for_day(&self, day_start_ts: i64, day_end_ts: i64) -> Result<Vec<JobModel>> {
+    pub fn get_jobs_for_day(&self, _day_start_ts: i64, _day_end_ts: i64) -> Result<Vec<JobModel>> {
         let mut stmt = self.conn.prepare(
             r#"
             SELECT
                 id, name, description,
                 def_start_ts, def_end_ts,
                 start_ts, end_ts,
-                proccess_path, cron, color
+                proccess_path, tags, cron, color
             FROM jobs
             ORDER BY start_ts ASC
             "#,
@@ -430,11 +678,13 @@ impl Database {
             let proccess_path_str: String = row.get(7)?;
             let proccess_path: Vec<Option<i64>> = proccess_path_str
                 .split(',')
-                .filter(|s| !s.is_empty() && s.to_string() != "None")
+                .filter(|s| !s.is_empty() && *s != "None")
                 .map(|s| s.trim().parse::<i64>().ok())
                 .collect();
+            let tags_raw: Option<String> = row.get(8)?;
 
             Ok(JobModel {
+                id: Some(row.get(0)?),
                 name: row.get(1)?,
                 description: row.get(2)?,
                 def_start_ts: row.get(3)?,
@@ -442,8 +692,9 @@ impl Database {
                 start_ts: row.get(5)?,
                 end_ts: row.get(6)?,
                 proccess_path,
-                cron: row.get(8)?,
-                color: row.get(9)?,
+                tags: Self::parse_tags_json(tags_raw),
+                cron: row.get(9)?,
+                color: row.get(10)?,
             })
         })?;
 

@@ -1,9 +1,8 @@
-use chrono::{DateTime, Local, TimeZone, Timelike};
+use chrono::{DateTime, Local, NaiveDate, TimeZone, Timelike};
 use dioxus::prelude::*;
 
 use crate::{
-    config::DATABASE_PATH,
-    core::{Database, JobModel},
+    core::{JobModel, TagModel},
     lib::convert_ts_to_local_date,
     ui::{ColorPicker, TimeInput},
 };
@@ -12,7 +11,11 @@ use crate::{
 pub struct JobFormProps {
     #[props(default = None)]
     pub job: Option<JobModel>,
+    /// Календарный день для новой задачи (время задаётся отдельно).
+    pub day: NaiveDate,
+    /// Секунды от полуночи для начала (новая задача).
     pub start_ts: i64,
+    /// Секунды от полуночи для конца (новая задача).
     pub end_ts: i64,
     pub on_save: Callback<JobModel>,
     pub on_cancel: Callback<()>,
@@ -23,13 +26,25 @@ fn ts_to_time(ts: i64) -> u32 {
     (dt.hour() * 3600 + dt.minute() * 60 + dt.second()) as u32
 }
 
+fn naive_day_start(d: NaiveDate) -> DateTime<Local> {
+    let n = d.and_hms_opt(0, 0, 0).unwrap();
+    Local
+        .from_local_datetime(&n)
+        .latest()
+        .unwrap_or_else(|| Local::now())
+}
+
 fn combine(date: DateTime<Local>, time: u32) -> i64 {
     let dt = date
         .date_naive()
         .and_hms_opt((time / 3600) % 24, (time % 3600) / 60, time % 60)
         .unwrap();
 
-    Local.from_local_datetime(&dt).unwrap().timestamp()
+    Local
+        .from_local_datetime(&dt)
+        .latest()
+        .unwrap_or_else(|| Local::now())
+        .timestamp()
 }
 
 #[component]
@@ -65,20 +80,43 @@ pub fn JobForm(props: JobFormProps) -> Element {
             .unwrap_or("#3b82f6".to_string())
     });
 
-    let mut start_date =
-        use_signal(|| convert_ts_to_local_date(props.start_ts.try_into().unwrap()));
-    let mut end_date = use_signal(|| convert_ts_to_local_date(props.end_ts.try_into().unwrap()));
+    let day_anchor = props.day;
+    let mut start_date = use_signal(|| {
+        props.job.as_ref().map_or_else(
+            || naive_day_start(day_anchor),
+            |j| convert_ts_to_local_date((j.start_ts as i64 * 1000) as u64),
+        )
+    });
+    let mut end_date = use_signal(|| {
+        props.job.as_ref().map_or_else(
+            || naive_day_start(day_anchor),
+            |j| convert_ts_to_local_date((j.end_ts as i64 * 1000) as u64),
+        )
+    });
 
     let mut start_time = use_signal(|| {
         props
             .job
             .as_ref()
-            .map(|j| j.start_ts)
-            .unwrap_or(props.start_ts) as u32
+            .map(|j| ts_to_time(j.start_ts))
+            .unwrap_or(props.start_ts.clamp(0, 86_399) as u32)
     });
 
-    let mut end_time =
-        use_signal(|| props.job.as_ref().map(|j| j.end_ts).unwrap_or(props.end_ts) as u32);
+    let mut end_time = use_signal(|| {
+        props
+            .job
+            .as_ref()
+            .map(|j| ts_to_time(j.end_ts))
+            .unwrap_or(props.end_ts.clamp(0, 86_399) as u32)
+    });
+
+    let mut tags_line = use_signal(|| {
+        props
+            .job
+            .as_ref()
+            .map(|j| j.tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", "))
+            .unwrap_or_default()
+    });
 
     rsx! {
         h2 {
@@ -96,6 +134,16 @@ pub fn JobForm(props: JobFormProps) -> Element {
                     class: "w-full px-3 py-2 border rounded-md bg-background",
                     value: "{name}",
                     oninput: move |e| name.set(e.value()),
+                }
+            }
+
+            div {
+                label { class: "text-sm font-medium", "Описание" }
+                input {
+                    class: "w-full px-3 py-2 border rounded-md bg-background",
+                    value: "{description}",
+                    oninput: move |e| description.set(e.value()),
+                    placeholder: "Необязательно"
                 }
             }
 
@@ -129,7 +177,21 @@ pub fn JobForm(props: JobFormProps) -> Element {
 
                 ColorPicker {
                     color: color,
-                    onselect: move |c| color.set(c),
+                    onselect: move |c: String| {
+                        color.set(c.clone());
+                        
+                        document::eval(format!("document.querySelector('.job-modal-refw').style.outline = '2px solid {}';", c).as_str());
+                    },
+                }
+            }
+
+            div {
+                label { class: "text-sm font-medium", "Теги (через запятую)" }
+                input {
+                    class: "w-full px-3 py-2 border rounded-md bg-background",
+                    value: "{tags_line}",
+                    oninput: move |e| tags_line.set(e.value()),
+                    placeholder: "код, веб, созвон"
                 }
             }
         }
@@ -167,14 +229,22 @@ pub fn JobForm(props: JobFormProps) -> Element {
                     job.start_ts = start_ts;
                     job.end_ts = end_ts;
                     job.color = color();
-
-                    if !description().trim().is_empty() {
-                        job.description = Some(description().trim().to_string());
-                    }
+                    job.description = if description().trim().is_empty() {
+                        None
+                    } else {
+                        Some(description().trim().to_string())
+                    };
 
                     if !cron().trim().is_empty() {
                         job.cron = Some(cron().trim().to_string());
                     }
+
+                    job.tags = tags_line()
+                        .split(',')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .map(|tag_name| TagModel::new(tag_name, None, "#94a3b8"))
+                        .collect();
 
                     props.on_save.call(job);
                 },

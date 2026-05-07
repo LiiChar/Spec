@@ -26,8 +26,11 @@ pub struct TooltipProps {
     pub class: String,
     #[props(default = false)]
     pub at_cursor: bool,
+    #[props(default = false)]
+    pub visible: bool,
     #[props(default = 2)]
     pub gap: u64,
+    
 }
 
 #[component]
@@ -43,17 +46,17 @@ pub fn Tooltip(props: TooltipProps) -> Element {
             TooltipAlign::Bottom => format!("left-1/2 top-full -translate-x-1/2 mt-2"),
         },
         true => match props.align {
-            TooltipAlign::Left => format!("-translate-y-1/2 mr-2"),
-            TooltipAlign::Right => format!("-translate-y-1/2 ml-2"),
-            TooltipAlign::Center => format!("-translate-x-1/2 mt-2"),
+            TooltipAlign::Left => format!("-translate-y-1/2 -translate-x-full -ml-{}", props.gap),
+            TooltipAlign::Right => format!("-translate-y-1/2 translate-x-full -mr-{}", props.gap),
+            TooltipAlign::Center => format!("-translate-x-1/2 -translate-y-1/2"),
             TooltipAlign::Top => format!("-translate-x-1/2 -translate-y-full -mt-{}", props.gap),
-            TooltipAlign::Bottom => format!("-translate-x-1/2 mt-2"),
+            TooltipAlign::Bottom => format!("-translate-x-1/2  translate-y-full -mb-{}", props.gap),
         },
     };
 
     rsx! {
         div {
-            class: "relative w-full h-full",
+            class: "relative w-full h-full {props.class}",
             onmouseenter: move |_| {
                 spawn(async move {
                         sleep(TOOLTIP_HIDE_DELAY).await;
@@ -90,10 +93,10 @@ pub fn Tooltip(props: TooltipProps) -> Element {
 
             {props.children}
 
-            if visible() {
+            if visible() || props.visible {
                 div {
                     role: "tooltip",
-                    class: "absolute pointer-events-none whitespace-nowrap rounded-md border backdrop-blur-md border-border/40 bg-secondary/50 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class} {props.class}",
+                    class: "absolute pointer-events-none whitespace-nowrap rounded-md border backdrop-blur-md border-border/40 bg-secondary/50 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class} ",
                     style: match props.at_cursor {
                         true => format!("position: fixed; left: {}px; top: {}px; z-index: 2147483647;", position()[0], position()[1]),
                         false => "z-index: 2147483647;".to_string(),

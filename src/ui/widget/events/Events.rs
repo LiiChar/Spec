@@ -3,27 +3,18 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 
 use crate::{
-    core::EventModel,
     lib::format_duration_short,
     ui::{
-        AppProvider, ChartType, EventsCharts, EventsList, EventsStats, EventsTimelineView, JobForm,
-        Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant, TimelineOrientation,
+        EventsStats, EventsTimelineView,
+        Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant, TimelineOrientation, use_app,
     },
 };
 
-#[derive(PartialEq, Clone)]
-pub enum ViewMode {
-    Timeline,
-    List,
-    Stats,
-}
-
 #[component]
 pub fn Events() -> Element {
-    let context = use_context::<AppProvider>();
+    let context = use_app();
     let events = context.events;
     let jobs = context.jobs;
-    let mut view_mode: Signal<ViewMode> = use_signal(|| ViewMode::Timeline);
 
     let value = events.clone();
     let summary = use_memo(move || {

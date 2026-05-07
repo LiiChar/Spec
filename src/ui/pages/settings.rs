@@ -1,27 +1,32 @@
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, rc::Rc};
 
 use crate::{
-    core::{with_database, with_database_mut, EventModel, JobModel},
-    ui::{AppProvider, SettingsProvider, ToasterProvider, Switch, Theme, Button},
+    core::{
+        EventModel, GoalModel, JobModel, TagModel, app_tag_preset_groups, with_database, with_database_mut
+    },
+    ui::{AppProvider, Button, Switch, Theme, ToasterProvider, use_app, use_settings, use_toast},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SettingsExportData {
     events: Vec<EventModel>,
     jobs: Vec<JobModel>,
+    #[serde(default)]
+    goals: Vec<GoalModel>,
 }
 
 fn export_data_to_json() -> Result<String, String> {
     let events = with_database(|db| db.get_all_events()).map_err(|err| err.to_string())?;
     let jobs = with_database(|db| db.get_jobs()).map_err(|err| err.to_string())?;
+    let goals = with_database(|db| db.get_goals()).map_err(|err| err.to_string())?;
 
-    serde_json::to_string_pretty(&SettingsExportData { events, jobs })
+    serde_json::to_string_pretty(&SettingsExportData { events, jobs, goals })
         .map_err(|err| err.to_string())
 }
 
-fn import_data_from_json(raw: &str) -> Result<(usize, usize), String> {
+fn import_data_from_json(raw: &str) -> Result<(usize, usize, usize), String> {
     let data: SettingsExportData = serde_json::from_str(raw).map_err(|err| err.to_string())?;
 
     with_database_mut(|db| {
@@ -32,7 +37,11 @@ fn import_data_from_json(raw: &str) -> Result<(usize, usize), String> {
             db.insert_jobs(job).map_err(|err| err.to_string())?;
         }
 
-        Ok((data.events.len(), data.jobs.len()))
+        for goal in &data.goals {
+            db.insert_goal(goal).map_err(|err| err.to_string())?;
+        }
+
+        Ok((data.events.len(), data.jobs.len(), data.goals.len()))
     })
 }
 
@@ -53,31 +62,16 @@ fn pick_export_file() -> Option<PathBuf> {
 
 #[component]
 pub fn SettingsPage() -> Element {
-    let mut app = use_context::<AppProvider>();
-    let settings = use_context::<SettingsProvider>();
-    let mut toast = use_context::<ToasterProvider>();
+    let mut app = use_app();
+    let settings_rc = Rc::new(use_settings());
+    let settings = settings_rc.settings.read().clone();
 
-    let mut theme = settings.theme;
-    let mut enable_notifications = settings.enable_notifications;
-    let notification_delay_ms = settings.notification_delay_ms;
-    let tracker_report_interval_ms = settings.tracker_report_interval_ms;
-    let db_flush_interval_ms = settings.db_flush_interval_ms;
-    let mut event_limit = settings.event_limit;
-    let mut compact_timeline = settings.compact_timeline;
-    let mut show_idle_events = settings.show_idle_events;
-    let mut auto_start_tracking = settings.auto_start_tracking;
+    let mut toast = use_toast();
+    let info: Callback<(String, Option<String>)> = Callback::new(move |(title, description)| toast.clone().info(title, description, None));
 
     let mut selected_import_file = use_signal(String::new);
     let mut selected_export_file = use_signal(String::new);
-    let mut status = use_signal(String::new);
     let mut is_busy = use_signal(|| false);
-
-    let update_u64 = |mut signal: Signal<u64>, fallback: u64| {
-        move |evt: FormEvent| {
-            let value = evt.value().parse::<u64>().unwrap_or(fallback);
-            signal.set(value);
-        }
-    };
 
     rsx! {
         div { class: "mx-auto flex w-full max-w-5xl flex-col gap-4 p-2",
@@ -94,11 +88,15 @@ pub fn SettingsPage() -> Element {
                         "Тема"
                         select {
                             class: "h-10 rounded-md border border-border/40 bg-background px-3 text-foreground outline-none focus:border-primary",
-                            value: "{theme().as_str()}",
-                            onchange: move |evt| {
-                                match evt.value().as_str() {
-                                    "light" => theme.set(Theme::Light),
-                                    _ => theme.set(Theme::Dark),
+                            value: "{settings.theme.as_str()}",
+                            onchange: {
+                                let st = settings_rc.clone();
+                                move |evt| {
+                                    let mut c = (*st).clone();
+                                    match evt.value().as_str() {
+                                        "light" => c.set_theme(Theme::Light),
+                                        _ => c.set_theme(Theme::Dark),
+                                    }
                                 }
                             },
                             option { value: "dark", "Темная" }
@@ -109,25 +107,78 @@ pub fn SettingsPage() -> Element {
                     SettingsSwitch {
                         title: "Компактная таймлиния".to_string(),
                         hint: "Уплотняет отображение коротких событий.".to_string(),
-                        checked: compact_timeline(),
-                        onclick: move |_| compact_timeline.set(!compact_timeline()),
+                        checked: settings.compact_timeline,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().compact_timeline;
+                                c.set_compact_timeline(v);
+                            }
+                        },
                     }
 
                     SettingsSwitch {
                         title: "Показывать idle".to_string(),
                         hint: "Оставляет периоды простоя в событиях.".to_string(),
-                        checked: show_idle_events(),
-                        onclick: move |_| show_idle_events.set(!show_idle_events()),
+                        checked: settings.show_idle_events,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().show_idle_events;
+                                c.set_show_idle_events(v);
+                            }
+                        },
                     }
 
                     SettingsSwitch {
                         title: "Автостарт трекинга".to_string(),
                         hint: "Флаг для запуска трекера вместе с приложением.".to_string(),
-                        checked: auto_start_tracking(),
-                        onclick: move |_| auto_start_tracking.set(!auto_start_tracking()),
+                        checked: settings.auto_start_tracking,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().auto_start_tracking;
+                                c.set_auto_start_tracking(v);
+                            }
+                        },
                     }
                 }
             }
+
+            // section { class: "rounded-md border border-border/40 bg-background/70 p-4",
+            //     h2 { class: "mb-2 text-base font-semibold text-foreground", "Шаблонные теги по приложениям" }
+            //     p { class: "mb-4 text-xs text-foreground/55",
+            //         "Готовые наборы тегов для типичных программ. Добавление в справочник не дублирует уже существующие имена."
+            //     }
+            //     div { class: "flex flex-col gap-3",
+            //         for group in app_tag_preset_groups() {
+            //             div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
+            //                 div { class: "mb-2 text-sm font-medium text-foreground", "{group.title}" }
+            //                 p { class: "mb-2 text-xs text-foreground/55", "{group.hint}" }
+            //                 div { class: "flex flex-wrap gap-2",
+            //                     for tag in group.tags.iter().cloned() {
+            //                         span { class: "rounded-full border border-border/40 bg-background px-2 py-0.5 text-xs text-foreground/80",
+            //                             "{tag.name}"
+            //                         }
+            //                     }
+            //                 }
+            //                 button {
+            //                     class: "mt-3 rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/25",
+            //                     onclick: move |_| {
+            //                         let title = group.title.to_string();
+            //                         let tags: Vec<TagModel> = group.tags.iter().cloned().collect();
+            //                         let inserted = with_database_mut(|db| db.merge_tags(&tags)).unwrap_or(0);
+            //                         info((format!("«{title}»: добавлено тегов: {inserted}."), None));
+            //                     },
+            //                     "Добавить в справочник"
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div {
@@ -135,7 +186,7 @@ pub fn SettingsPage() -> Element {
                     h2 { class: "mb-4 text-base font-semibold text-foreground", "Уведомления и сбор данных" }
                     Button {
                         onclick: move |_| {
-                            toast.info("Тест".to_string(), Some("Тестовое описание".to_string()), None)
+                            info(("Тест".to_string(), Some("Тестовое описание".to_string())))
                         },
                         "Уведомление"
                     }
@@ -145,29 +196,57 @@ pub fn SettingsPage() -> Element {
                     SettingsSwitch {
                         title: "Уведомления".to_string(),
                         hint: "Разрешить отложенную отправку уведомлений.".to_string(),
-                        checked: enable_notifications(),
-                        onclick: move |_| enable_notifications.set(!enable_notifications()),
+                        checked: settings.enable_notifications,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().enable_notifications;
+                                c.set_notifications(v);
+                            }
+                        },
                     }
 
                     NumberSetting {
                         title: "Delay уведомлений, мс".to_string(),
-                        value: notification_delay_ms().to_string(),
+                        value: format!("{}", settings.notification_delay_ms),
                         min: "0".to_string(),
-                        oninput: update_u64(notification_delay_ms, 1_500),
+                        oninput: {
+                            let st = settings_rc.clone();
+                            move |evt: FormEvent| {
+                                let mut c = (*st).clone();
+                                let v = evt.value().parse::<u64>().unwrap_or(1_500);
+                                c.set_notification_delay(v);
+                            }
+                        },
                     }
 
                     NumberSetting {
                         title: "Интервал отчета трекера, мс".to_string(),
-                        value: tracker_report_interval_ms().to_string(),
+                        value: format!("{}", settings.report_interval),
                         min: "250".to_string(),
-                        oninput: update_u64(tracker_report_interval_ms, 5_000),
+                        oninput: {
+                            let st = settings_rc.clone();
+                            move |evt: FormEvent| {
+                                let mut c = (*st).clone();
+                                let v = evt.value().parse::<u64>().unwrap_or(5_000);
+                                c.set_tracker_interval(v);
+                            }
+                        },
                     }
 
                     NumberSetting {
                         title: "Интервал записи в БД, мс".to_string(),
-                        value: db_flush_interval_ms().to_string(),
+                        value: format!("{}", settings.db_flush_interval_ms),
                         min: "100".to_string(),
-                        oninput: update_u64(db_flush_interval_ms, 750),
+                        oninput: {
+                            let st = settings_rc.clone();
+                            move |evt: FormEvent| {
+                                let mut c = (*st).clone();
+                                let v = evt.value().parse::<u64>().unwrap_or(750);
+                                c.set_db_flush_interval(v);
+                            }
+                        },
                     }
 
                     label { class: "flex flex-col gap-2 text-sm text-foreground/70",
@@ -176,10 +255,14 @@ pub fn SettingsPage() -> Element {
                             r#type: "number",
                             min: "1",
                             class: "h-10 rounded-md border border-border/40 bg-background px-3 text-foreground outline-none focus:border-primary",
-                            value: "{event_limit()}",
-                            oninput: move |evt| {
-                                let value = evt.value().parse::<i64>().unwrap_or(1_000).max(1);
-                                event_limit.set(value);
+                            value: "{settings.event_limit}",
+                            oninput: {
+                                let st = settings_rc.clone();
+                                move |evt| {
+                                    let mut c = (*st).clone();
+                                    let value = evt.value().parse::<i64>().unwrap_or(1_000).max(1);
+                                    c.set_event_limit(value);
+                                }
                             },
                         }
                     }
@@ -190,95 +273,93 @@ pub fn SettingsPage() -> Element {
                 div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",
                     div {
                         h2 { class: "text-base font-semibold text-foreground", "Импорт и экспорт" }
-                        p { class: "mt-1 text-xs text-foreground/55", "Формат файла: JSON с полями events и jobs." }
+                        p { class: "mt-1 text-xs text-foreground/55", "Формат файла: JSON с полями events, jobs и goals." }
                     }
 
                     div { class: "flex flex-wrap gap-2",
                         button {
-    class: "rounded-md border border-border/40 bg-background px-3 py-2 text-sm text-foreground hover:bg-foreground/5 disabled:opacity-50",
-    disabled: is_busy(),
-    onclick: move |_| {
-        spawn(async move {
-            let Some(path) = pick_export_file() else {
-                return;
-            };
+                            class: "rounded-md border border-border/40 bg-background px-3 py-2 text-sm text-foreground hover:bg-foreground/5 disabled:opacity-50",
+                            disabled: is_busy(),
+                            onclick: move |_| {
+                                spawn(async move {
+                                    let Some(path) = pick_export_file() else {
+                                        return;
+                                    };
 
-            selected_export_file.set(path.display().to_string());
-            is_busy.set(true);
-            status.set("Готовлю экспорт...".to_string());
+                                    selected_export_file.set(path.display().to_string());
+                                    is_busy.set(true);
+                                    info(("Готовлю экспорт...".to_string(), None));
 
-            let result = tokio::task::spawn_blocking(move || {
-                let json = export_data_to_json()?;
-                fs::write(&path, json).map_err(|err| err.to_string())?;
-                Ok::<_, String>(path)
-            }).await;
+                                    let result = tokio::task::spawn_blocking(move || {
+                                        let json = export_data_to_json()?;
+                                        fs::write(&path, json).map_err(|err| err.to_string())?;
+                                        Ok::<_, String>(path)
+                                    }).await;
 
-            match result {
-                Ok(Ok(path)) => {
-                    selected_export_file.set(path.display().to_string());
-                    status.set(format!("Экспорт сохранен: {}", path.display()));
-                }
-                Ok(Err(err)) => {
-                    status.set(format!("Ошибка экспорта: {err}"));
-                }
-                Err(err) => {
-                    status.set(format!("Ошибка задачи экспорта: {err}"));
-                }
-            }
+                                    match result {
+                                        Ok(Ok(path)) => {
+                                            selected_export_file.set(path.display().to_string());
+                                            info((format!("Экспорт сохранен: {}", path.display()), None));
+                                        }
+                                        Ok(Err(err)) => {
+                                            info((format!("Ошибка экспорта: {err}"), None));
+                                        }
+                                        Err(err) => {
+                                            info((format!("Ошибка задачи экспорта: {err}"), None));
+                                        }
+                                    }
 
-            is_busy.set(false);
-        });
-    },
-    "Экспорт в файл"
-}
+                                    is_busy.set(false);
+                                });
+                            },
+                            "Экспорт в файл"
+                        }
 
                         button {
-    class: "rounded-md border border-primary/40 bg-primary/20 px-3 py-2 text-sm text-foreground hover:bg-primary/30 disabled:opacity-50",
-    disabled: is_busy(),
-    onclick: move |_| {
-        spawn(async move {
-            let Some(path) = pick_import_file() else {
-                return;
-            };
+                            class: "rounded-md border border-primary/40 bg-primary/20 px-3 py-2 text-sm text-foreground hover:bg-primary/30 disabled:opacity-50",
+                            disabled: is_busy(),
+                            onclick: move |_| {
+                                spawn(async move {
+                                    let Some(path) = pick_import_file() else {
+                                        return;
+                                    };
 
-            selected_import_file.set(path.display().to_string());
-            is_busy.set(true);
-            status.set("Импортирую данные...".to_string());
+                                    selected_import_file.set(path.display().to_string());
+                                    is_busy.set(true);
+                                    info(("Импортирую данные...".to_string(), None));
 
-            let result = tokio::task::spawn_blocking(move || {
-                let raw = fs::read_to_string(&path).map_err(|err| err.to_string())?;
-                let counts = import_data_from_json(&raw)?;
-                Ok::<_, String>((path, counts))
-            }).await;
+                                    let result = tokio::task::spawn_blocking(move || {
+                                        let raw = fs::read_to_string(&path).map_err(|err| err.to_string())?;
+                                        let counts = import_data_from_json(&raw)?;
+                                        Ok::<_, String>((path, counts))
+                                    }).await;
 
-            match result {
-                Ok(Ok((path, (event_count, job_count)))) => {
-                    let refreshed_events =
-                        with_database(|db| db.get_all_events()).unwrap_or_default();
-                    let refreshed_jobs =
-                        with_database(|db| db.get_jobs()).unwrap_or_default();
+                                    match result {
+                                        Ok(Ok((path, (event_count, job_count, goal_count)))) => {
+                                            let refreshed_events =
+                                                with_database(|db| db.get_all_events()).unwrap_or_default();
+                                            let refreshed_jobs =
+                                                with_database(|db| db.get_jobs()).unwrap_or_default();
 
-                    app.events.set(refreshed_events);
-                    app.jobs.set(refreshed_jobs);
+                                            app.events.set(refreshed_events);
+                                            app.jobs.set(refreshed_jobs);
 
-                    selected_import_file.set(path.display().to_string());
-                    status.set(format!(
-                        "Импортировано: events {event_count}, jobs {job_count}."
-                    ));
-                }
-                Ok(Err(err)) => {
-                    status.set(format!("Ошибка импорта: {err}"));
-                }
-                Err(err) => {
-                    status.set(format!("Ошибка задачи импорта: {err}"));
-                }
-            }
+                                            selected_import_file.set(path.display().to_string());
+                                            info((format!("Импортировано: events {event_count}, jobs {job_count}, goals {goal_count}."), None));
+                                        }
+                                        Ok(Err(err)) => {
+                                            info((format!("Ошибка импорта: {err}"), None));
+                                        }
+                                        Err(err) => {
+                                            info((format!("Ошибка задачи импорта: {err}"), None));
+                                        }
+                                    }
 
-            is_busy.set(false);
-        });
-    },
-    "Импорт из файла"
-}
+                                    is_busy.set(false);
+                                });
+                            },
+                            "Импорт из файла"
+                        }
                     }
                 }
 
@@ -291,12 +372,6 @@ pub fn SettingsPage() -> Element {
                     FileStatus {
                         title: "Последний импорт".to_string(),
                         path: selected_import_file(),
-                    }
-                }
-
-                if !status().is_empty() {
-                    div { class: "mt-3 rounded-md border border-border/30 bg-foreground/5 px-3 py-2 text-sm text-foreground/70",
-                        "{status}"
                     }
                 }
             }

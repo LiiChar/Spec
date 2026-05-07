@@ -1,6 +1,9 @@
 use dioxus::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+use crate::lib::{load_settings, save_settings};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Theme {
     Light,
     Dark,
@@ -15,31 +18,113 @@ impl Theme {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SettingsProvider {
-    pub theme: Signal<Theme>,
-    pub enable_notifications: Signal<bool>,
-    pub notification_delay_ms: Signal<u64>,
-    pub tracker_report_interval_ms: Signal<u64>,
-    pub db_flush_interval_ms: Signal<u64>,
-    pub event_limit: Signal<i64>,
-    pub compact_timeline: Signal<bool>,
-    pub show_idle_events: Signal<bool>,
-    pub auto_start_tracking: Signal<bool>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Settings {
+    pub theme: Theme,
+    pub enable_notifications: bool,
+    pub notification_delay_ms: u64,
+    pub db_flush_interval_ms: u64,
+    pub event_limit: i64,
+    pub compact_timeline: bool,
+    pub show_idle_events: bool,
+    pub auto_start_tracking: bool,
+    pub idle_threshold: u32,
+    pub event_duration: u32,
+    pub report_interval: u64,
 }
 
-impl Default for SettingsProvider {
+impl Default for Settings {
     fn default() -> Self {
         Self {
-            theme: Signal::new(Theme::Dark),
-            enable_notifications: Signal::new(true),
-            notification_delay_ms: Signal::new(1_500),
-            tracker_report_interval_ms: Signal::new(5_000),
-            db_flush_interval_ms: Signal::new(750),
-            event_limit: Signal::new(1_000),
-            compact_timeline: Signal::new(true),
-            show_idle_events: Signal::new(true),
-            auto_start_tracking: Signal::new(true),
+            theme: Theme::Dark,
+            enable_notifications: true,
+            notification_delay_ms: 1500,
+            db_flush_interval_ms: 750,
+            event_limit: 1000,
+            compact_timeline: true,
+            show_idle_events: true,
+            auto_start_tracking: true,
+            event_duration: 60,
+            idle_threshold: 250,
+            report_interval: 5000
         }
     }
+}
+
+
+#[derive(Clone)]
+pub struct SettingsState {
+    pub settings: Signal<Settings>,
+}
+
+impl SettingsState {
+    pub fn save(&self) {
+        let data = self.settings.read().clone();
+        let _ = save_settings(&data);
+    }
+
+    fn mutate<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut Settings),
+    {
+        {
+            // Захватываем блокировку на запись
+            let mut write_guard = self.settings.write();
+            // Передаём мутабельную ссылку на Settings в замыкание
+            f(&mut *write_guard);
+            // Здесь write_guard выходит из области видимости и разблокируется
+        }
+        // Сохраняем после того, как изменения применены
+        self.save();
+    }
+
+    // ===== API =====
+
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.mutate(|s| s.theme = theme);
+    }
+
+    pub fn set_notifications(&mut self, v: bool) {
+        self.mutate(|s| s.enable_notifications = v);
+    }
+
+    pub fn set_notification_delay(&mut self, v: u64) {
+        self.mutate(|s| s.notification_delay_ms = v);
+    }
+
+    pub fn set_tracker_interval(&mut self, v: u64) {
+        self.mutate(|s| s.report_interval = v);
+    }
+
+    pub fn set_db_flush_interval(&mut self, v: u64) {
+        self.mutate(|s| s.db_flush_interval_ms = v);
+    }
+
+    pub fn set_event_limit(&mut self, v: i64) {
+        self.mutate(|s| s.event_limit = v);
+    }
+
+    pub fn set_compact_timeline(&mut self, v: bool) {
+        self.mutate(|s| s.compact_timeline = v);
+    }
+
+    pub fn set_show_idle_events(&mut self, v: bool) {
+        self.mutate(|s| s.show_idle_events = v);
+    }
+
+    pub fn set_auto_start_tracking(&mut self, v: bool) {
+        self.mutate(|s| s.auto_start_tracking = v);
+    }
+}
+
+pub fn provide_settings() {
+    let initial = load_settings();
+
+    use_context_provider(|| SettingsState {
+        settings: Signal::new(initial),
+    });
+}
+
+pub fn use_settings() -> SettingsState {
+    use_context::<SettingsState>()
 }

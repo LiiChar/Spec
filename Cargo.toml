@@ -33,6 +33,9 @@ image = "0.25"
 base64 = "0.22"
 dioxus-signals = "0.7.4"
 dioxus-free-icons = { version = "0.10.0", features = ["lucide"] }
+auto-launch = "0.6.0"
+directories = "6.0.0"
+rusqlite_migration = "2.5.0"
 
 
 
@@ -41,3 +44,12 @@ default = ["desktop"]
 web = ["dioxus/web"]
 desktop = ["dioxus/desktop"]
 mobile = ["dioxus/mobile"]
+
+
+[profile.release]
+opt-level = "z"
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
+incremental = false

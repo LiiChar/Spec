@@ -4,9 +4,11 @@ use chrono::{Datelike, NaiveDate, Timelike};
 use dioxus::prelude::*;
 
 use crate::{
-    core::{with_database, EventModel, EventType},
+    core::{EventModel, EventType, GoalModel, JobModel, with_database, with_database_mut},
     lib::{convert_ts_to_local_date, format_duration_short},
+    ui::{Calendar, GoalForm, JobForm, Tooltip, TooltipAlign, use_app},
 };
+use chrono::Local;
 
 #[derive(Debug, Clone, PartialEq)]
 struct AppUsage {
@@ -59,6 +61,10 @@ struct StatsView {
 
 fn parse_date(value: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()
+}
+
+fn job_anchor_day(job: &JobModel) -> NaiveDate {
+    convert_ts_to_local_date((job.start_ts as i64 * 1000) as u64).date_naive()
 }
 
 fn event_app(event: &EventModel) -> String {
@@ -266,24 +272,20 @@ pub fn StatisticsPage() -> Element {
                 p { class: "text-sm text-foreground/60", "Сводка по всем дням, приложениям, активности и пикам работы за компьютером." }
             }
 
+            GoalsJobsPanel {}
+
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div { class: "grid gap-3 md:grid-cols-4",
                     label { class: "flex flex-col gap-2 text-sm text-foreground/70",
                         "Дата от"
-                        input {
-                            r#type: "date",
-                            class: "h-10 rounded-md border border-border/40 bg-background px-3 text-foreground outline-none focus:border-primary",
-                            value: "{date_from()}",
-                            oninput: move |evt| date_from.set(evt.value()),
+                        Calendar {
+                            onselect: move |date: NaiveDate| date_from.set(date.format("%Y-%m-%d").to_string()),
                         }
                     }
                     label { class: "flex flex-col gap-2 text-sm text-foreground/70",
                         "Дата до"
-                        input {
-                            r#type: "date",
-                            class: "h-10 rounded-md border border-border/40 bg-background px-3 text-foreground outline-none focus:border-primary",
-                            value: "{date_to()}",
-                            oninput: move |evt| date_to.set(evt.value()),
+                         Calendar {
+                            onselect: move |date: NaiveDate| date_to.set(date.format("%Y-%m-%d").to_string()),
                         }
                     }
                     label { class: "flex flex-col gap-2 text-sm text-foreground/70 md:col-span-2",
@@ -373,6 +375,222 @@ pub fn StatisticsPage() -> Element {
 }
 
 #[component]
+fn GoalsJobsPanel() -> Element {
+    let app = use_app();
+    let jobs = app.jobs;
+    let goals = app.goals;
+    let mut show_goal_form = use_signal(|| false);
+    let mut goal_edit = use_signal(|| None::<GoalModel>);
+    let mut show_job_form = use_signal(|| false);
+    let mut job_edit = use_signal(|| None::<JobModel>);
+
+    let goals_done = goals().iter().filter(|g| g.completed).count();
+    let jobs_tagged = jobs().iter().filter(|j| !j.tags.is_empty()).count();
+    let day = Local::now().date_naive();
+
+    rsx! {
+        section { class: "rounded-md border border-border/40 bg-background/70 p-4",
+            div { class: "mb-3 flex flex-wrap items-center justify-between gap-3",
+                div {
+                    h2 { class: "text-base font-semibold text-foreground", "Цели и задачи" }
+                    p { class: "text-xs text-foreground/55",
+                        "Сводка по записям в базе: цели с тегами и процессом, задачи с тегами и расписанием."
+                    }
+                }
+                div { class: "flex flex-wrap gap-2",
+                    button {
+                        class: "rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/25",
+                        onclick: move |_| {
+                            goal_edit.set(None);
+                            show_goal_form.set(true);
+                        },
+                        "Новая цель"
+                    }
+                    button {
+                        class: "rounded-md border border-border/40 bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-foreground/5",
+                        onclick: move |_| {
+                            job_edit.set(None);
+                            show_job_form.set(true);
+                        },
+                        "Новая задача"
+                    }
+                }
+            }
+
+            div { class: "grid gap-3 sm:grid-cols-2 lg:grid-cols-4",
+                div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
+                    div { class: "text-xs text-foreground/55", "Целей всего" }
+                    div { class: "text-lg font-semibold text-foreground", "{goals().len()}" }
+                }
+                div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
+                    div { class: "text-xs text-foreground/55", "Целей выполнено" }
+                    div { class: "text-lg font-semibold text-foreground", "{goals_done}" }
+                }
+                div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
+                    div { class: "text-xs text-foreground/55", "Задач всего" }
+                    div { class: "text-lg font-semibold text-foreground", "{jobs().len()}" }
+                }
+                div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
+                    div { class: "text-xs text-foreground/55", "Задач с тегами" }
+                    div { class: "text-lg font-semibold text-foreground", "{jobs_tagged}" }
+                }
+            }
+
+            div { class: "mt-4 grid gap-4 lg:grid-cols-2",
+                div {
+                    h3 { class: "mb-2 text-sm font-medium text-foreground", "Цели" }
+                    div { class: "flex max-h-64 flex-col gap-2 overflow-auto pr-1",
+                        if goals().is_empty() {
+                            div { class: "text-sm text-foreground/55", "Пока нет целей — создайте первую." }
+                        }
+                        for g in goals().iter().cloned() {
+                            div { class: "rounded-md border border-border/30 p-3",
+                                div { class: "flex items-start justify-between gap-2",
+                                    div {
+                                        div { class: "text-sm font-medium text-foreground", "{g.name}" }
+                                        div { class: "text-xs text-foreground/55", "{g.process}" }
+                                        if let Some(desc) = g.description.clone() {
+                                            div { class: "mt-1 text-xs text-foreground/60", "{desc}" }
+                                        }
+                                        div { class: "mt-2 flex flex-wrap gap-1",
+                                            for t in g.tags.iter().cloned() {
+                                                span { class: "rounded-full border border-border/40 px-2 py-0.5 text-[10px] text-foreground/80",
+                                                    "{t.name}"
+                                                }
+                                            }
+                                        }
+                                    }
+                                    button {
+                                        class: "shrink-0 rounded border border-border/40 px-2 py-1 text-xs hover:bg-foreground/5",
+                                        onclick: move |_| {
+                                            goal_edit.set(Some(g.clone()));
+                                            show_goal_form.set(true);
+                                        },
+                                        "Изменить"
+                                    }
+                                }
+                                div { class: "mt-2 text-[10px] text-foreground/45",
+                                    if g.completed { "Статус: выполнено" } else { "Статус: в работе" }
+                                    " · порог "
+                                    "{g.ordering.as_str()}"
+                                }
+                            }
+                        }
+                    }
+                }
+
+                div {
+                    h3 { class: "mb-2 text-sm font-medium text-foreground", "Задачи" }
+                    div { class: "flex max-h-64 flex-col gap-2 overflow-auto pr-1",
+                        if jobs().is_empty() {
+                            div { class: "text-sm text-foreground/55", "Задач нет — добавьте из календаря или здесь." }
+                        }
+                        for j in jobs().iter().take(40).cloned() {
+                            div { class: "rounded-md border border-border/30 p-3",
+                                div { class: "flex items-start justify-between gap-2",
+                                    div {
+                                        div { class: "text-sm font-medium text-foreground", "{j.name}" }
+                                        div { class: "mt-2 flex flex-wrap gap-1",
+                                            for t in j.tags.iter().cloned() {
+                                                span { class: "rounded-full border border-border/40 px-2 py-0.5 text-[10px] text-foreground/80",
+                                                    "{t.name}"
+                                                }
+                                            }
+                                        }
+                                    }
+                                    button {
+                                        class: "shrink-0 rounded border border-border/40 px-2 py-1 text-xs hover:bg-foreground/5",
+                                        onclick: move |_| {
+                                            job_edit.set(Some(j.clone()));
+                                            show_job_form.set(true);
+                                        },
+                                        "Изменить"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if show_goal_form() {
+            div {
+                class: "fixed inset-0 z-[250] flex items-center justify-center bg-black/50 p-4",
+                onclick: move |_| show_goal_form.set(false),
+                div {
+                    class: "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border/40 bg-background p-6 shadow-xl",
+                    onclick: move |e| e.stop_propagation(),
+                    button {
+                        class: "mb-2 float-right rounded px-2 text-sm text-foreground/60 hover:bg-foreground/10",
+                        onclick: move |_| show_goal_form.set(false),
+                        "✕"
+                    }
+                    GoalForm {
+                        day,
+                        goal: goal_edit(),
+                        on_save: Callback::new(move |g: GoalModel| {
+                            spawn(async move {
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    with_database_mut(|db| {
+                                        if g.id.is_some() {
+                                            db.update_goal(&g)
+                                        } else {
+                                            db.insert_goal(&g).map(|_| ())
+                                        }
+                                    })
+                                })
+                                .await;
+                            });
+                            show_goal_form.set(false);
+                        }),
+                        on_cancel: Callback::new(move |_| show_goal_form.set(false)),
+                    }
+                }
+            }
+        }
+
+        if show_job_form() {
+            div {
+                class: "fixed inset-0 z-[250] flex items-center justify-center bg-black/50 p-4",
+                onclick: move |_| show_job_form.set(false),
+                div {
+                    class: "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border/40 bg-background p-6 shadow-xl",
+                    onclick: move |e| e.stop_propagation(),
+                    button {
+                        class: "mb-2 float-right rounded px-2 text-sm text-foreground/60 hover:bg-foreground/10",
+                        onclick: move |_| show_job_form.set(false),
+                        "✕"
+                    }
+                    JobForm {
+                        day: job_edit().as_ref().map(job_anchor_day).unwrap_or(day),
+                        job: job_edit(),
+                        start_ts: 9 * 3600,
+                        end_ts: 18 * 3600,
+                        on_save: Callback::new(move |job: JobModel| {
+                            spawn(async move {
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    with_database_mut(|db| {
+                                        if job.id.is_some() {
+                                            db.update_job(&job)
+                                        } else {
+                                            db.save_job(&job).map(|_| ())
+                                        }
+                                    })
+                                })
+                                .await;
+                            });
+                            show_job_form.set(false);
+                        }),
+                        on_cancel: Callback::new(move |_| show_job_form.set(false)),
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
 fn MetricCard(title: String, value: String, hint: String) -> Element {
     rsx! {
         div { class: "rounded-md border border-border/40 bg-background/70 p-4",
@@ -414,7 +632,7 @@ fn DailyUsageChart(days: Vec<DayUsage>) -> Element {
                 }
             }
 
-            div { class: "relative flex h-full items-end gap-2 overflow-x-auto overflow-y-visible pb-8 pt-6",
+            div { class: "relative flex h-full items-end gap-2 overflow-x-auto overflow-y-visible pb-8 pt-6 overflow-hidden",
                 for day in visible_days.into_iter().rev() {
                     DailyUsageBar { day, max_ms }
                 }
@@ -439,27 +657,37 @@ fn DailyUsageBar(day: DayUsage, max_ms: u64) -> Element {
     let idle_height = (bar_height - active_height).max(0.0);
 
     rsx! {
-        div { class: "group relative flex h-[250px] min-w-8 flex-1 flex-col items-center justify-end gap-2",
-            div { class: "absolute bottom-[260px] left-1/2 z-30 hidden w-52 -translate-x-1/2 rounded-md border border-border/40 bg-background/95 p-2 text-xs shadow-lg backdrop-blur-md group-hover:block",
-                div { class: "font-semibold text-foreground", "{day.date.format(\"%d.%m.%Y\")}" }
-                div { class: "mt-1 text-foreground/65", "Всего: {format_duration_short(day.total_ms)}" }
-                div { class: "text-foreground/65", "Активно: {format_duration_short(day.active_ms)}" }
-                div { class: "text-foreground/65", "Idle: {format_duration_short(day.idle_ms)}" }
-                div { class: "truncate text-foreground/65", "Топ: {day.top_app}" }
-            }
-            div {
-                class: "flex w-full max-w-9 flex-col justify-end overflow-hidden rounded-t-md rounded-b-sm border border-primary/20 bg-foreground/10 shadow-sm transition-transform group-hover:scale-[1.04]",
-                style: "height: {bar_height}px;",
+        div { class: "group relative flex h-[250px] min-w-8 flex-1 flex-col items-center justify-start gap-2",
+            
+            Tooltip {
+                class: "flex items-end justify-center",
+                align: TooltipAlign::Right,
+                gap: 2,
+                target: rsx! {
+                    div { class: "",
+                        div { class: "font-semibold text-foreground", "{day.date.format(\"%d.%m.%Y\")}" }
+                        div { class: "mt-1 text-foreground/65", "Всего: {format_duration_short(day.total_ms)}" }
+                        div { class: "text-foreground/65", "Активно: {format_duration_short(day.active_ms)}" }
+                        div { class: "text-foreground/65", "Idle: {format_duration_short(day.idle_ms)}" }
+                        div { class: "truncate text-foreground/65", "Топ: {day.top_app}" }
+                    }
+                },
                 div {
-                    class: "w-full bg-primary/25",
-                    style: "height: {idle_height}px;",
-                }
-                div {
-                    class: "w-full bg-primary shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_35%,transparent)]",
-                    style: "height: {active_height}px;",
-                }
+                        class: "flex w-full max-w-9 flex-col justify-start items-center overflow-hidden rounded-t-md rounded-b-sm border border-primary/20 bg-foreground/10 shadow-sm transition-transform",
+                        style: "height: {bar_height}px;",
+                        div {
+                            class: "w-full bg-primary/25",
+                            style: "height: {idle_height}px;",
+                        }
+                        div {
+                            class: "w-full bg-primary shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_35%,transparent)]",
+                            style: "height: {active_height}px;",
+                        }
+                    }
+                
             }
-            div { class: "h-4 text-[10px] text-foreground/45", "{day.date.day()}" }
+            
+            div { class: "h-4 text-[10px] text-foreground/45", "{day.date.format(\"%d.%m\")}" }
         }
     }
 }
@@ -497,18 +725,19 @@ fn HourActivityCell(hour: HourUsage, max_ms: u64) -> Element {
     let alpha = 0.08 + intensity * 0.28;
 
     rsx! {
+
         div { class: "group rounded-md border border-border/30 bg-foreground/[0.03] p-2 transition-colors hover:border-primary/50 hover:bg-primary/5",
-            div { class: "mb-2 flex items-center justify-between gap-1",
-                span { class: "text-xs font-medium text-foreground/65", "{hour.hour:02}" }
-                span { class: "text-[10px] text-foreground/40", "{active_percent:.0}%" }
-            }
-            div { class: "flex h-20 items-end overflow-hidden rounded-sm bg-foreground/10",
-                div {
-                    class: "w-full rounded-t-sm bg-primary transition-all",
-                    style: "height: {fill_height}px; opacity: {alpha};",
-                }
-            }
-            div { class: "mt-2 truncate text-xs font-medium text-foreground", "{format_duration_short(hour.total_ms)}" }
+        div { class: "mb-2 flex items-center justify-between gap-1",
+        span { class: "text-xs font-medium text-foreground/65", "{hour.hour:02}" }
+        span { class: "text-[10px] text-foreground/40", "{active_percent:.0}%" }
+        }
+        div { class: "flex h-20 items-end overflow-hidden rounded-sm bg-foreground/10",
+        div {
+            class: "w-full rounded-t-sm bg-primary transition-all",
+            style: "height: {fill_height}px; opacity: {alpha};",
+        }
+        }
+        div { class: "mt-2 truncate text-xs font-medium text-foreground", "{format_duration_short(hour.total_ms)}" }
         }
     }
 }
@@ -524,15 +753,21 @@ fn DailyBar(day: DayUsage, max_ms: u64) -> Element {
 
     rsx! {
         div { class: "group flex min-w-8 flex-1 flex-col items-center justify-end gap-1",
-            div { class: "relative flex w-full max-w-10 items-end overflow-hidden rounded-sm bg-foreground/10", style: "height: {height}%;",
-                div { class: "w-full bg-primary/80", style: "height: {active_height}%;" }
-                div { class: "absolute inset-x-0 bottom-full z-20 hidden -translate-y-2 rounded-md border border-border/40 bg-background px-2 py-1 text-xs shadow-sm group-hover:block",
+            Tooltip {
+                align: TooltipAlign::Right,
+                target: rsx! {
+                    div { class: "text-xs",
                     div { class: "font-medium text-foreground", "{day.date.format(\"%d.%m.%Y\")}" }
                     div { class: "text-foreground/65", "Всего: {format_duration_short(day.total_ms)}" }
                     div { class: "text-foreground/65", "Топ: {day.top_app}" }
                 }
+                    
+                },
+                div { class: "relative flex w-full max-w-10 items-end overflow-hidden rounded-sm bg-foreground/10", style: "height: {height}%;",
+                        div { class: "w-full bg-primary/80", style: "height: {active_height}%;" }
+                    }
             }
-            span { class: "text-[10px] text-foreground/45", "{day.date.day()}" }
+            span { class: "text-[10px] text-foreground/45", "{day.date.format(\"%d.%m\")}" }
         }
     }
 }

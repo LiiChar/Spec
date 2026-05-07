@@ -4,27 +4,38 @@ mod ui;
 
 use core::*;
 use ui::*;
+use dioxus::prelude::*;
 
-use std::{sync::Mutex, thread, time::Duration};
+use std::{path::Path, sync::Mutex, thread, time::Duration};
 
 use crossbeam_channel::Receiver;
 use dioxus::{
     desktop::{Config, WindowBuilder},
-    logger::tracing::Level,
+    logger::tracing::Level, prelude::{Asset, asset},
 };
 use once_cell::sync::Lazy;
+
+use crate::lib::{Builder, load_icon, load_settings};
 
 static RX: Lazy<Mutex<Option<Receiver<EventModel>>>> = Lazy::new(|| Mutex::new(None));
 static DB: Lazy<Mutex<Option<Database>>> = Lazy::new(|| Mutex::new(None));
 
-const TRACKER_REPORT_INTERVAL_MS: u64 = 5_000;
-const DB_FLUSH_INTERVAL_MS: u64 = 750;
 const DB_BATCH_SIZE: usize = 64;
+const TRAY_ICON: Asset = asset!("/assets/tray_icon.png");
 
 fn main() {
     dioxus::logger::init(Level::INFO).unwrap();
+    let settings = load_settings();
 
-    let window_config = WindowBuilder::new().with_decorations(false);
+    if settings.auto_start_tracking {
+        let builder = Builder::new();
+        let autolaunch = builder.build().unwrap();
+        autolaunch.enable().unwrap();
+    }
+
+    let icon = load_icon(&Path::new(TRAY_ICON.bundled().absolute_source_path()));
+
+    let window_config = WindowBuilder::new().with_decorations(false).with_window_icon(Some(icon));
     let database = Database::new(DATABASE_PATH);
     *DB.lock().unwrap() = Some(database);
 
@@ -43,12 +54,13 @@ fn main() {
         }
     });
 
+    // получение событий и сохранение в базу
     thread::spawn(move || {
         let mut database = Database::new(DATABASE_PATH);
         let mut pending = Vec::with_capacity(DB_BATCH_SIZE);
 
         loop {
-            match rx_db.recv_timeout(Duration::from_millis(DB_FLUSH_INTERVAL_MS)) {
+            match rx_db.recv_timeout(Duration::from_millis(settings.db_flush_interval_ms)) {
                 Ok(event) => {
                     pending.push(event);
 
@@ -79,9 +91,11 @@ fn main() {
         }
     });
 
+    // отправка событий в обработчик
     thread::spawn(move || {
-        core::tracker::start_tracking(tx_forward, TRACKER_REPORT_INTERVAL_MS);
+        core::tracker::start_tracking(tx_forward);
     });
+    
 
     dioxus::LaunchBuilder::desktop()
         .with_cfg(Config::new().with_window(window_config))

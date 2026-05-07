@@ -8,12 +8,12 @@ const MIN_STABLE_SEGMENT_MS: u64 = 180_000;
 // новое
 const MAX_NOISE_CHAIN: usize = 2;
 
-pub fn merge_events(events: &[EventModel]) -> Vec<EventModel> {
+pub fn merge_events(events: Vec<EventModel>) -> Vec<EventModel> {
     if events.is_empty() {
         return Vec::new();
     }
 
-    let mut current = events.to_vec();
+    let mut current = events;
     current.sort_by_key(|e| e.timestamp);
 
     loop {

@@ -9,10 +9,10 @@ use dioxus::{
 use dioxus_free_icons::icons::ld_icons::{LdMinus, LdPlus, LdTarget};
 use dioxus_free_icons::Icon;
 
-use crate::ui::{JobFormModal, ToasterProvider};
+use crate::ui::{JobFormModal, ToasterProvider, use_app, use_toast};
 use crate::{
     config::DATABASE_PATH,
-    core::{with_database, Database, JobModel},
+    core::{with_database, with_database_mut, Database, JobModel},
     ui::{AppProvider, EventsCalendar, TimeInput},
 };
 
@@ -20,9 +20,9 @@ use crate::{
 pub fn Header() -> Element {
     let window = use_window();
 
-    let mut toast = use_context::<ToasterProvider>();
+    let mut toast = use_toast();
 
-    let mut context = use_context::<AppProvider>();
+    let mut context = use_app();
     let events = context.events;
     let day = context.day;
     let mut time = context.time;
@@ -294,22 +294,26 @@ pub fn Header() -> Element {
                 start_ts: time_start.read().clone().into(),
                 end_ts: time_end.read().clone().into(),
                 on_save: move |job: JobModel| {
+                    let mut ctx = context.clone();
                     spawn(async move {
                         let result = tokio::task::spawn_blocking(move || {
-                            with_database(|db| {
-                                db.save_job(&job)
-                            })
-                        }).await;
+                            with_database_mut(|db| db.save_job(&job))
+                        })
+                        .await;
 
                         match result {
                             Ok(Ok(id)) => {
-                                println!("Saved job id: {}", id)
-                            },
+                                if let Ok(jobs) = with_database(|db| db.get_jobs()) {
+                                    ctx.jobs.set(jobs);
+                                }
+                                println!("Saved job id: {}", id);
+                            }
                             Ok(Err(e)) => println!("DB error: {:?}", e),
                             Err(e) => println!("Task error: {:?}", e),
                         }
                     });
                     toast.success("Задача успешно создана".to_string(), None, None);
+                    show_job_form.set(false);
                 },
                 on_cancel: move |_| {
                     show_job_form.set(false);

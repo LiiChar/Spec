@@ -2,14 +2,9 @@ use chrono::{DateTime, Local, Timelike};
 use dioxus::prelude::*;
 
 use crate::{
-    config::DATABASE_PATH,
-    core::{with_database, Database, EventModel, JobModel},
-    lib::convert_ts_to_local_date,
-    ui::{
-        AppProvider, Layout, Page, Router, SettingsProvider, ToasterProvider, Tray,
-        INITIAL_EVENT_LIMIT, MAX_EVENTS_IN_MEMORY,
-    },
-    DB, RX,
+    DB, RX, config::DATABASE_PATH, core::{Database, EventModel, JobModel, get_current_window, with_database}, lib::convert_ts_to_local_date, ui::{
+        AppProvider, INITIAL_EVENT_LIMIT, Layout, MAX_EVENTS_IN_MEMORY, Page, Router, ToasterProvider, Tray, provide_app, provide_settings, provide_toast, use_app
+    }
 };
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -17,11 +12,11 @@ const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 #[component]
 pub fn Root() -> Element {
-    use_context_provider(|| AppProvider::default());
-    use_context_provider(|| SettingsProvider::default());
-    use_context_provider(|| ToasterProvider::default());
+    provide_settings();
+    provide_app();
+    provide_toast();
 
-    let context = use_context::<AppProvider>();
+    let context = use_app();
     let mut events = context.events;
     let mut jobs = context.jobs;
     let day = context.day;

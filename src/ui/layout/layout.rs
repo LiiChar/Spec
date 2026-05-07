@@ -1,11 +1,11 @@
 use dioxus::prelude::*;
 
-use crate::ui::{Header, Navigate, SettingsProvider, Theme, Toaster};
+use crate::ui::{Header, Navigate, Theme, Toaster, use_settings};
 
 #[component]
 pub fn Layout(children: Element) -> Element {
-    let settings = use_context::<SettingsProvider>();
-    let theme_class = match (settings.theme)() {
+    let settings = use_settings().settings.read().clone();
+    let theme_class = match settings.theme {
         Theme::Light => "",
         Theme::Dark => "dark",
     };

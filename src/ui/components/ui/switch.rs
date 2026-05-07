@@ -12,7 +12,7 @@ pub struct SwitchProps {
 pub fn Switch(props: SwitchProps) -> Element {
     rsx! {
         div {
-            class: format!("w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-all {}",
+            class: format!("w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-all border border-border/40 {}",
               if props.checked { "bg-primary" } else { "bg-muted" }
             ),
             onclick: move |e: MouseEvent| props.onclick.call(e),

@@ -1,10 +1,12 @@
+use std::cmp::Ordering;
+
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
 use dioxus::prelude::*;
 
 use crate::{
     core::{EventModel, EventType, JobModel},
     lib::{convert_ts_to_local_date, format_duration_short, get_process_color},
-    ui::{TimelineOrientation, Tooltip, TooltipAlign},
+    ui::{TimelineOrientation, Tooltip, TooltipAlign, use_app},
 };
 
 #[derive(Props, PartialEq, Clone)]
@@ -26,8 +28,17 @@ pub struct EventsElementProps {
     pub style: String,
 }
 
+pub fn sort_by_duration(a: &JobModel, b: &JobModel) -> Ordering {
+    (&b.end_ts - &b.start_ts).cmp(&((&a.end_ts - &a.start_ts)))
+}
+
 #[component]
 pub fn EventElement(props: EventsElementProps) -> Element {
+    let app = use_app();
+    let mut jobs = props.jobs.clone();
+
+    jobs.sort_by(sort_by_duration);
+
     let mut selected_job = props.selected_job;
 
     let is_current_hour = {
@@ -58,24 +69,45 @@ pub fn EventElement(props: EventsElementProps) -> Element {
             },
 
             {
-                props
-                    .jobs
+                jobs
                     .clone()
                     .into_iter()
-                    .filter_map(|job| {
+                    .enumerate()
+                    .filter_map(|(i, job)| {
                         let range_start = props.start_hour * 3600;
                         let range_end = (props.end_hour + 1) * 3600;
-                        let mut start_sec = job.start_ts;
-                        let mut end_sec = job.end_ts;
+
+                        let (mut start_sec, mut end_sec) = if job.start_ts > 86_400 {
+                            let day_start = app
+                                .day
+                                .read()
+                                .date_naive()
+                                .and_hms_opt(0, 0, 0)
+                                .unwrap()
+                                .and_local_timezone(chrono::Local)
+                                .unwrap()
+                                .timestamp();
+
+                            (
+                                job.start_ts - day_start,
+                                job.end_ts - day_start,
+                            )
+                        } else {
+                            (job.start_ts, job.end_ts)
+                        };
+
                         if end_sec < start_sec {
                             end_sec += 86400;
                         }
+
                         let clamped_start = start_sec.max(range_start as i64);
                         let clamped_end = end_sec.min(range_end as i64);
-                        if clamped_end <= clamped_start {
+
+                        if clamped_end < clamped_start {
                             return None;
                         }
-                        let duration_sec = (clamped_end - clamped_start) as f32;
+
+                        let duration_sec = (clamped_end - clamped_start).max(1) as f32;
                         let total_seconds = (range_end - range_start) as f32;
                         let event_start_sec = (clamped_start - range_start as i64) as f32;
                         let offset = (event_start_sec / total_seconds) * 100.0;
@@ -89,7 +121,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         };
                         let has_prev = start_sec < range_start.into();
                         let has_next = end_sec > range_end.into();
-
+                        
                         Some({
                             let value = job.clone();
                             rsx! {
@@ -102,7 +134,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                         selected_job.set(None);
                                     },
                                     class: format!(
-                                        "absolute group w-1 right-0 z-100  cursor-pointer transition-all overflow-hidden {} {}",
+                                        "absolute group w-1 z-100  cursor-pointer transition-all overflow-hidden {} {}",
                                         has_prev.then(|| "").unwrap_or("rounded-tl-sm"),
                                         has_next.then(|| "").unwrap_or("rounded-bl-sm"),
                                     ),
@@ -111,23 +143,33 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                         match props.orientation {
                                             TimelineOrientation::Vertical => {
                                                 format!(
-                                                    "top: {}%; height: {}%; width: {};",
+                                                    "top: {}%; height: {}%; width: {}; right: {}px;",
                                                     offset,
                                                     size.max(0.5),
                                                     if is_select { "3px" } else { "3px" },
+                                                    i * 3
                                                 )
                                             }
                                             TimelineOrientation::Horizontal => {
                                                 format!(
-                                                    "left: {}%; width: {}%; height: {};",
+                                                    "left: {}%; width: {}%; height: {}; top: {}px;",
                                                     offset,
                                                     size.max(0.5),
                                                     if is_select { "3px" } else { "3px" },
+                                                    i * 3
                                                 )
                                             }
                                         },
                                         job.color,
-                                    )
+                                    ),
+                                    Tooltip {
+                                        align: TooltipAlign::Left,
+                                        text: "{job.name}",
+                                        at_cursor: true,
+                                        div {
+                                            class: "w-full h-full"
+                                        }
+                                    }
                                 }
                             }
                         })

@@ -6,12 +6,12 @@ use dioxus::prelude::*;
 use crate::{
     core::{EventModel, EventType},
     lib::convert_ts_to_local_date,
-    ui::AppProvider,
+    ui::{AppProvider, use_app},
 };
 
 #[component]
 pub fn EventsStats() -> Element {
-    let context = use_context::<AppProvider>();
+    let context = use_app();
     let events = context.events;
 
     let value = events.clone();
@@ -112,7 +112,7 @@ pub fn EventsStats() -> Element {
         div {
             class: "flex flex-col gap-3 rounded-md",
             div {
-                class: "rounded-md shadow-sm p-3 bg-secondary/40 border border-border/30",
+                class: "rounded-md shadow-sm p-3  border border-border/30",
                 h3 { class: "text-lg font-semibold mb-3 flex flex-col",
                     span {
                         "Статистика"
@@ -153,11 +153,11 @@ pub fn EventsStats() -> Element {
                 }
             }
             div {
-                class: "rounded-md shadow-sm p-3 bg-secondary/40 border border-border/30",
+                class: "rounded-md shadow-sm p-3  border border-border/30",
                 h3 { class: "text-sm font-semibold mb-3", "Приложения ({num_apps})" }
                 div { class: "flex flex-col gap-1",
                     for (app, active, idle, icon) in app_list {
-                        div { class: "flex justify-between items-center p-1.5 rounded hover:bg-background/30 transition-colors",
+                        div { class: "flex justify-between items-center p-1.5 rounded hover:bg-secondary/30 transition-colors",
                             div {
                                 class: "flex gap-2 items-center",
                                 if let Some(icon) = icon {

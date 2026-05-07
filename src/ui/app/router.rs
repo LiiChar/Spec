@@ -1,4 +1,4 @@
-use crate::ui::{AppProvider, MainPage, SettingsPage, StatisticsPage};
+use crate::ui::{AppProvider, MainPage, SettingsPage, StatisticsPage, use_app};
 use dioxus::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -10,7 +10,7 @@ pub enum Page {
 
 #[component]
 pub fn Router() -> Element {
-    let context = use_context::<AppProvider>();
+    let context = use_app();
     let page = context.page;
 
     rsx! {

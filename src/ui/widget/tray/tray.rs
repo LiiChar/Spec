@@ -39,7 +39,9 @@ pub fn Tray() -> Element {
     let builder = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_menu_on_left_click(false)
-        .with_icon(icon);
+        .with_icon(icon)
+        .with_title("Spec")
+        .with_tooltip("Spec");
 
     provide_context(builder.build().expect("tray icon builder failed"));
 

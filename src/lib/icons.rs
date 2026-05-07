@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use dioxus::desktop::tao::window::Icon;
 
 /// Кеш иконок: процесс -> base64 PNG
 static ICON_CACHE: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
@@ -293,4 +294,17 @@ pub fn get_process_color_gradient(process_name: &str) -> &'static str {
 
         _ => "from-zinc-600 to-zinc-400",
     }
+}
+
+
+pub fn load_icon(path: &std::path::Path) -> Icon {
+    let (icon_rgba, icon_width, icon_height) = {
+        let image = image::open(path)
+            .expect("Failed to open icon path")
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+    Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
 }

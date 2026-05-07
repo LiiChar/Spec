@@ -1,13 +1,17 @@
+use chrono::NaiveDate;
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::LdX;
+use dioxus_free_icons::Icon;
 
 use crate::{
-    config::DATABASE_PATH,
-    core::{Database, JobModel},
-    lib::{convert_ts_to_local_date, get_start_day_ts},
+    core::{with_database_mut, JobModel},
+    lib::convert_ts_to_local_date,
     ui::JobForm,
 };
-use dioxus_free_icons::Icon;
+
+fn job_anchor_day(job: &JobModel) -> NaiveDate {
+    convert_ts_to_local_date((job.start_ts as i64 * 1000) as u64).date_naive()
+}
 
 #[derive(Props, PartialEq, Clone, Debug)]
 pub struct JobModalProps {
@@ -27,7 +31,7 @@ pub fn JobModal(props: JobModalProps) -> Element {
                     props.on_close.call(());
                 },
                 div {
-                    class: "bg-background p-6 rounded-lg shadow-lg max-w-96 overflow-y-auto relative",
+                    class: "bg-background p-6 rounded-lg shadow-lg max-w-96 overflow-y-auto relative job-modal-refw",
                     style: format!("outline: 2px solid {}", job.color),
                     onclick: move |evt| evt.stop_propagation(),
                     button {
@@ -40,28 +44,28 @@ pub fn JobModal(props: JobModalProps) -> Element {
                         }
                     }
                   {
-                    let ts = get_start_day_ts();
-
                     let job = job.clone();
-
-                    let start_ts = convert_ts_to_local_date((ts + job.start_ts * 1000).try_into().unwrap());
-                    let end_ts = convert_ts_to_local_date((ts + job.end_ts * 1000).try_into().unwrap());
-
                     rsx! {
-                      JobForm { job: Some(job.clone()), end_ts: job.end_ts, start_ts: job.start_ts, on_save: move |job: JobModel| {
-                        spawn(async move {
-                            let result = tokio::task::spawn_blocking(move || {
-                                let db = Database::new(DATABASE_PATH);
-                                db.update_job(&job)
-                            }).await;
+                      JobForm {
+                        job: Some(job.clone()),
+                        day: job_anchor_day(&job),
+                        end_ts: job.end_ts,
+                        start_ts: job.start_ts,
+                        on_save: move |job: JobModel| {
+                            spawn(async move {
+                                let result =
+                                    tokio::task::spawn_blocking(move || with_database_mut(|db| db.update_job(&job)))
+                                        .await;
 
-                            match result {
-                                Ok(Ok(id)) => println!("Saved job id: {}", id),
-                                Ok(Err(e)) => println!("DB error: {:?}", e),
-                                Err(e) => println!("Task error: {:?}", e),
-                            }
-                        });
-                    }, on_cancel:  |_| () }
+                                match result {
+                                    Ok(Ok(())) => println!("Job updated"),
+                                    Ok(Err(e)) => println!("DB error: {:?}", e),
+                                    Err(e) => println!("Task error: {:?}", e),
+                                }
+                            });
+                        },
+                        on_cancel: |_| (),
+                      }
                     }
                   }
                 }

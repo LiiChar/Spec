@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::ui::{AppProvider, Page, Tooltip, TooltipAlign};
+use crate::ui::{AppProvider, Page, Tooltip, TooltipAlign, use_app};
 use dioxus_free_icons::{
     icons::ld_icons::{LdAreaChart, LdHome, LdMenu, LdSettings, LdX},
     Icon,
@@ -8,7 +8,7 @@ use dioxus_free_icons::{
 
 #[component]
 pub fn Navigate() -> Element {
-    let context = use_context::<AppProvider>();
+    let context = use_app();
     let mut page = context.page;
     let mut visible = use_signal(|| false);
 

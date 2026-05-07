@@ -9,10 +9,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::GetLastInputInfo;
 use windows::Win32::UI::Input::KeyboardAndMouse::LASTINPUTINFO;
 
 use crate::core::{get_current_window, EventModel, EventType, WindowModel};
-use crate::lib::current_ts;
-
-const IDLE_THRESHOLD_SECS: u32 = 60;
-const MIN_EVENT_DURATION_MS: u128 = 250;
+use crate::lib::{current_ts, load_settings};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Activity {
@@ -34,17 +31,23 @@ impl Activity {
 pub struct Tracker {
     current: Option<Activity>,
     start_time: Instant,
-    report_interval: Duration,
     pub stats: HashMap<String, Duration>,
+    pub idle_threshold: u32,
+    pub event_duration: u32,
+    pub report_interval: Duration,
 }
 
 impl Tracker {
-    pub fn new(report_interval: Duration) -> Self {
+    pub fn new() -> Self {
+        let settings = load_settings();
         Self {
             current: None,
             start_time: Instant::now(),
-            report_interval,
+            report_interval: Duration::from_millis(settings.report_interval),
             stats: HashMap::new(),
+            idle_threshold: settings.idle_threshold,
+            event_duration: settings.event_duration,
+
         }
     }
 
@@ -61,7 +64,7 @@ impl Tracker {
     }
 
     fn send_event(&self, activity: &Activity, duration: Duration, tx: &Sender<EventModel>) {
-        if duration.as_millis() < MIN_EVENT_DURATION_MS {
+        if duration.as_millis() < self.event_duration as u128 {
             return;
         }
 
@@ -135,20 +138,21 @@ fn is_user_idle(threshold_secs: u32) -> bool {
     }
 }
 
-pub fn start_tracking(tx: Sender<EventModel>, report_interval_ms: u64) {
-    let tracker = Arc::new(Mutex::new(Tracker::new(Duration::from_millis(
-        report_interval_ms,
-    ))));
+pub fn start_tracking(tx: Sender<EventModel>) {
+    let tracker = Arc::new(Mutex::new(Tracker::new()));
     let running = Arc::new(Mutex::new(true));
 
     let t_tracker = tracker.clone();
     let t_running = running.clone();
 
+    let interval = t_tracker.lock().unwrap().report_interval;
+    let threshold = t_tracker.lock().unwrap().idle_threshold;
+
     thread::spawn(move || {
-        let poll_interval = Duration::from_millis(report_interval_ms);
+        let poll_interval = interval;
 
         while *t_running.lock().unwrap() {
-            let idle = is_user_idle(IDLE_THRESHOLD_SECS);
+            let idle = is_user_idle(threshold);
             let next_activity = match get_current_window(None) {
                 Some(win) if !win.process_path.trim().is_empty() => Activity {
                     window: Some(win),

@@ -10,9 +10,9 @@ use dioxus_free_icons::Icon;
 
 use crate::{
     config::DATABASE_PATH,
-    core::{database::database, Database, EventModel, JobModel},
+    core::{Database, EventModel, EventType, JobModel, database::database},
     lib::{convert_ts_to_local_date, merge_events},
-    ui::{EventElement, JobFormModal, JobModal},
+    ui::{EventElement, JobFormModal, JobModal, use_settings},
 };
 
 #[derive(PartialEq, Clone)]
@@ -220,10 +220,21 @@ fn y_to_timestamp(y: f64, selected_hour: Option<u32>, day_start: u64) -> u64 {
 
 #[component]
 pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
+    let settings = use_settings();
+
     let day_events = use_memo(move || {
+        let show_idle = settings.settings.read().show_idle_events;
+
         let merged = {
             let items = props.events.read();
-            merge_events(&items)
+            let items = items.iter().filter_map(move |i| {
+                if !show_idle && i.event_type == EventType::Idle {
+                    None
+                } else {
+                    Some(i.clone())
+                }
+            }).collect::<Vec<_>>();
+            merge_events(items)
         };
 
         let segments = group_by_segments(&merged);
@@ -240,63 +251,12 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
     let mut selected_hour = use_signal(|| None::<u32>);
     let mut selected_job = use_signal(|| None::<JobModel>);
 
-    // let mut on_mouse_down = use_signal(|| false);
-    // let mut start_mouse_position = use_signal(|| (0.0, 0.0));
-    // let mut end_mouse_position = use_signal(|| (0.0, 0.0));
-    // let mut timeline_height = use_signal(|| 0.0);
-    // let mut container_rect = use_signal(|| Rect::zero() as Rect<f64, Pixels>);
-    // let mut show_job_form = use_signal(|| false);
-    // let mut selected_job_range = use_signal(|| (0i64, 0i64));
-
     rsx! {
         JobModal {
             job: selected_job.read().clone(),
             on_close: move |_| selected_job.set(None),
         }
-        // JobFormModal {
-        //     visible: show_job_form,
-        //     start_ts: selected_job_range().0,
-        //     end_ts: selected_job_range().1,
-        //     on_save: move |job: JobModel| {
-        //         let _ = Database::new(DATABASE_PATH)
-        //             .insert_jobs(&job);
-        //         show_job_form.set(false);
-        //     },
-        //     on_cancel: move |_| {
-        //         show_job_form.set(false);
-        //     }
-        // }
         div {
-            // onmounted: move |e| {
-            //     async move {
-            //         let rect = e.get_client_rect().await.unwrap_or_default();
-            //         timeline_height.set(rect.size.height);
-            //         container_rect.set(rect);
-            //     }
-            // },
-            // onmousedown: move |evt| {
-            //     on_mouse_down.set(true);
-
-            //     let x: f64 = evt.page_coordinates().x as f64 - container_rect.read().origin.x as f64;
-            //     let y: f64 = evt.page_coordinates().y as f64 - container_rect.read().origin.y as f64;
-            //     start_mouse_position.set((x, y + 18.0));
-            //     end_mouse_position.set((x, y + 18.0));
-            // },
-            // onmousemove: move |evt| {
-            //     if on_mouse_down() {
-            //         evt.stop_propagation();
-            //         evt.prevent_default();
-            //         let x: f64 = evt.page_coordinates().x as f64 - container_rect.read().origin.x as f64;
-            //         let y: f64 = evt.page_coordinates().y as f64 - container_rect.read().origin.y as f64;
-            //         end_mouse_position.set((x, y + 18.0));
-            //     }
-            // },
-            // onmouseup: move |evt| {
-            //     let x: f64 = evt.page_coordinates().x as f64 - container_rect.read().origin.x as f64;
-            //     let y: f64 = evt.page_coordinates().y as f64 - container_rect.read().origin.y as f64;
-            //     end_mouse_position.set((x, y + 18.0));
-            //     on_mouse_down.set(false);
-            // },
             class: format!(
                 "flex w-full h-min relative rounded-md overflow-hidden border border-border/50 bg-card/30 user-select-none {}",
                 match props.orientation {
@@ -304,8 +264,6 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                     TimelineOrientation::Vertical => "flex-col",
                 },
             ),
-
-            // Keyboard navigation container
             div {
                 tabindex: 0,
                 onkeydown: move |evt| {
@@ -330,174 +288,6 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                 role: "application",
                 aria_label: "Таймлайн активности. Используйте стрелки вверх/вниз или k/j для навигации по часам",
             }
-
-            // if on_mouse_down() || end_mouse_position() != start_mouse_position() {
-            //     div {
-            //         onmousedown: move |evt| evt.stop_propagation(),
-            //         onmouseup: move |evt| evt.stop_propagation(),
-            //         class: "absolute bg-primary/20 z-30",
-            //         style: match props.orientation {
-            //             TimelineOrientation::Horizontal => {
-            //                 let start_x: i32 = start_mouse_position().0.floor() as i32;
-            //                 let end_x: i32 = end_mouse_position().0.floor() as i32;
-            //                 let left = start_x.min(end_x);
-            //                 let width = (end_x - start_x).abs();
-            //                 format!("width: {}px; height: 100%; left: {}px; top: 0;", width, left)
-            //             }
-            //             TimelineOrientation::Vertical => {
-            //                 let start_y: i32 = start_mouse_position().1.floor() as i32;
-            //                 let end_y: i32 = end_mouse_position().1.floor() as i32;
-            //                 let top = start_y.min(end_y);
-            //                 let height = (end_y - start_y).abs();
-            //                 format!("height: {}px; width: 100%; top: {}px; left: 0;", height, top)
-            //             }
-            //         },
-            //         {
-            //             // Calculate virtual total height based on 24 hours
-            //             let base_hour_height = 80.0;
-            //             let expanded_hour_height = 800.0;
-
-            //             let total_height: f64 = (0..24)
-            //                 .map(|h| {
-            //                     if selected_hour() == Some(h) {
-            //                         expanded_hour_height
-            //                     } else {
-            //                         base_hour_height
-            //                     }
-            //                 })
-            //                 .sum();
-
-            //             // Get Y positions based on orientation
-            //             let (start_pos, end_pos): (f64, f64) = match props.orientation {
-            //                 TimelineOrientation::Horizontal => {
-            //                     (start_mouse_position().0, end_mouse_position().0)
-            //                 }
-            //                 TimelineOrientation::Vertical => {
-            //                     (start_mouse_position().1, end_mouse_position().1)
-            //                 }
-            //             };
-
-            //             // Clamp to virtual timeline bounds
-            //             let start_y = start_pos.clamp(0.0, total_height);
-            //             let end_y = end_pos.clamp(0.0, total_height);
-
-            //             // Day start timestamp
-            //             let day_start = props.day.read()
-            //                 .date_naive()
-            //                 .and_hms_opt(0, 0, 0)
-            //                 .unwrap()
-            //                 .and_local_timezone(Local)
-            //                 .unwrap()
-            //                 .timestamp_millis() as u64;
-
-            //             // Convert Y positions to timestamps using virtual coordinate system
-            //             let mut from = y_to_timestamp(start_y, selected_hour(), day_start);
-            //             let mut to = y_to_timestamp(end_y, selected_hour(), day_start);
-
-            //             // Swap if dragged in reverse direction
-            //             if from > to {
-            //                 std::mem::swap(&mut from, &mut to);
-            //             }
-
-            //             let format_start_date = convert_ts_to_local_date(from).format("%d.%m.%Y %H:%M:%S").to_string();
-            //             let format_end_date = convert_ts_to_local_date(to).format("%d.%m.%Y %H:%M:%S").to_string();
-
-            //             println!("Selected range: {:?} {:?} (total_height: {:?})", format_start_date, format_end_date, total_height);
-
-            //             let selected_events = props.events
-            //                 .read()
-            //                 .iter()
-            //                 .cloned()
-            //                 .filter(|e| {
-            //                     let event_start = e.timestamp;
-            //                     let event_end = e.timestamp + e.duration;
-
-            //                     event_start < to && event_end > from
-            //                 })
-            //                 .collect::<Vec<_>>();
-
-            //             rsx! {
-
-            //                 div {
-            //                     class: "flex flex-col gap-1 w-1/3 text-xs h-full overflow-y-auto",
-            //                     {
-            //                         selected_events.clone().iter().map(|e| {
-            //                             if let Some(w) = &e.window {
-            //                                 rsx! {
-            //                                     div {
-            //                                         class: "flex items-center justify-center",
-            //                                         div {
-            //                                             "{w.title}"
-            //                                         }
-            //                                     }
-            //                                 }
-            //                             } else {
-            //                                 rsx! {
-            //                                     ""
-            //                                 }
-            //                             }
-            //                         })
-            //                     }
-            //                 }
-            //                 div {
-            //                     class: "absolute top-1 right-1 bg-background",
-            //                     button {
-            //                         class: "p-1 hover:bg-muted rounded",
-            //                         onclick: move |_| {
-            //                             selected_job_range.set((from as i64, to as i64));
-            //                             show_job_form.set(true);
-            //                         },
-            //                         Icon {icon: LdPlus}
-            //                     }
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
-
-            // {
-            //     props.jobs.read().clone().iter().map(|job| {
-            //         let day_start: i64 = props.day.read()
-            //             .date_naive()
-            //             .and_hms_opt(0, 0, 0)
-            //             .unwrap()
-            //             .and_local_timezone(Local)
-            //             .unwrap()
-            //             .timestamp_millis();
-            //         let job_start = job.start_ts - day_start.clone();
-            //         let job_end = job.end_ts - day_start.clone();
-
-            //         // Calculate position based on 24 hours with base height 80px per hour
-            //         let total_height: f64 = 80.0 * 24.0;
-            //         let hour_height = 80.0;
-
-            //         let start_y = (job_start / 3_600_000) as f64 * hour_height;
-            //         let end_y = (job_end / 3_600_000) as f64 * hour_height;
-            //         let height = (end_y - start_y).max(20.0);
-
-            //         rsx! {
-            //             div {
-            //                 onmousedown: move |evt| evt.stop_propagation(),
-            //                 onmouseup: move |evt| evt.stop_propagation(),
-            //                 class: format!("absolute left-2 right-2 z-10 rounded px-2 py-1 text-white text-xs z-5 flex justify-end"),
-            //                 style: format!("top: {}px; height: {}px; background-color: {}", start_y as i32, height as i32, job.color),
-            //                 div {
-            //                     class: "relative z-40",
-            //                     div {
-            //                         class: "font-medium truncate",
-            //                         "{job.name}"
-            //                     }
-            //                     if let Some(desc) = &job.description {
-            //                         div {
-            //                             class: "text-xs opacity-80 truncate",
-            //                             "{desc}"
-            //                         }
-            //                     }
-            //                 }
-            //             }
-            //         }
-            //     })
-            // }
             {
                 day_events
                     .iter()
@@ -520,21 +310,32 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                             .timestamp_millis();
                         let jobs = props.jobs.read();
                         let mut event_jobs: Vec<JobModel> = Vec::new();
-                        jobs
-                        .iter()
-                            .for_each(|job| {
-                                let st_timestamp = start_ts + job.start_ts * 1000 as i64;
-                                let ed_timestamp = start_ts + job.end_ts * 1000 as i64;
-                                let segment_st_timestamp = start_ts
-                                    + start_hour as i64 * 60 * 60 * 1000;
-                                let segment_ed_timestamp = start_ts
-                                    + end_hour as i64 * 60 * 60 * 1000;
-                                if st_timestamp <= segment_ed_timestamp
-                                    && ed_timestamp >= segment_st_timestamp
-                                {
-                                    event_jobs.push(job.clone());
-                                }
-                            });
+                        jobs.iter().for_each(|job| {
+                            let (st_timestamp, ed_timestamp) = if job.start_ts > 86_400 {
+                                (
+                                    job.start_ts * 1000,
+                                    job.end_ts * 1000,
+                                )
+                            } else {
+                                (
+                                    start_ts + job.start_ts * 1000,
+                                    start_ts + job.end_ts * 1000,
+                                )
+                            };
+
+                            let segment_st_timestamp =
+                                start_ts + start_hour as i64 * 60 * 60 * 1000;
+
+                            let segment_ed_timestamp =
+                                start_ts + (end_hour as i64 + 1) * 60 * 60 * 1000;
+
+                            if st_timestamp < segment_ed_timestamp
+                                && ed_timestamp >= segment_st_timestamp
+                            {
+                                event_jobs.push(job.clone());
+                            }
+                        });
+
                         rsx! {
                             div {
                                 class: "relative",

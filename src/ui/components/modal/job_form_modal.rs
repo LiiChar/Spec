@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::LdX;
 
-use crate::{core::JobModel, ui::JobForm};
+use crate::{core::JobModel, ui::{AppProvider, JobForm, use_app}};
 use dioxus_free_icons::Icon;
 
 #[derive(Props, PartialEq, Clone)]
@@ -17,6 +17,9 @@ pub struct JobFormModalProps {
 
 #[component]
 pub fn JobFormModal(props: JobFormModalProps) -> Element {
+    let context = use_app();
+    let day = context.day.read().date_naive();
+
     rsx! {
         if *props.visible.read() {
             div {
@@ -38,6 +41,7 @@ pub fn JobFormModal(props: JobFormModalProps) -> Element {
                         }
                     }
                     JobForm {
+                        day,
                         start_ts: props.start_ts,
                         end_ts: props.end_ts,
                         on_save: props.on_save,
