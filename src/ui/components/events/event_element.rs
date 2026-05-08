@@ -251,7 +251,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         let has_main_label = main_label.is_some();
                         let show_duration = event_px >= DURATION_MIN_PX;
                         rsx! {
-                            div {
+                             div {
                                 key: "{event.timestamp}-{event.duration}-{pid_str}",
                                 class: format!(
                                     "timeline-event absolute group left-0 right-0 {} cursor-pointer transition-all overflow-visible",
