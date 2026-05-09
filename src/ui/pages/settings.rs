@@ -182,9 +182,10 @@ pub fn SettingsPage() -> Element {
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div {
-                    class: "flex justify-between",
-                    h2 { class: "mb-4 text-base font-semibold text-foreground", "Уведомления и сбор данных" }
+                    class: "flex items-center justify-between mb-4",
+                    h2 { class: " text-base font-semibold text-foreground", "Уведомления и сбор данных" }
                     Button {
+                        class: "py-0.5!",
                         onclick: move |_| {
                             info(("Тест".to_string(), Some("Тестовое описание".to_string())))
                         },

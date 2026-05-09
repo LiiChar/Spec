@@ -2,11 +2,13 @@ use std::collections::{BTreeMap, HashMap};
 
 use chrono::{Datelike, NaiveDate, Timelike};
 use dioxus::prelude::*;
+use dioxus_free_icons::icons::ld_icons::LdTrash;
+use dioxus_free_icons::Icon;
 
 use crate::{
     core::{EventModel, EventType, GoalModel, JobModel, with_database, with_database_mut},
     lib::{convert_ts_to_local_date, format_duration_short},
-    ui::{Calendar, GoalForm, JobForm, Tooltip, TooltipAlign, use_app},
+    ui::{Calendar, GoalForm, JobForm, Tooltip, TooltipAlign, use_app, use_toast},
 };
 use chrono::Local;
 
@@ -377,6 +379,8 @@ pub fn StatisticsPage() -> Element {
 #[component]
 fn GoalsJobsPanel() -> Element {
     let app = use_app();
+    let mut toast = use_toast();
+
     let jobs = app.jobs;
     let goals = app.goals;
     let mut show_goal_form = use_signal(|| false);
@@ -387,6 +391,27 @@ fn GoalsJobsPanel() -> Element {
     let goals_done = goals().iter().filter(|g| g.completed).count();
     let jobs_tagged = jobs().iter().filter(|j| !j.tags.is_empty()).count();
     let day = Local::now().date_naive();
+
+    let d_app = app.clone();
+    let delete = Callback::new(move |id: i64| { 
+        d_app.delete_job(id);
+    });
+
+
+    let info = Callback::new(move |title: String| {
+        toast.info(title, None, None);
+    });
+
+    let jobs_list = jobs()
+    .clone()
+    .into_iter()
+    .take(40)
+    .map(|j| {
+        let edit_job = j.clone();
+        let delete_id = j.id.unwrap();
+        (j, edit_job, delete_id)
+    })
+    .collect::<Vec<_>>();
 
     rsx! {
         section { class: "rounded-md border border-border/40 bg-background/70 p-4",
@@ -485,27 +510,42 @@ fn GoalsJobsPanel() -> Element {
                         if jobs().is_empty() {
                             div { class: "text-sm text-foreground/55", "Задач нет — добавьте из календаря или здесь." }
                         }
-                        for j in jobs().iter().take(40).cloned() {
+
+                        for (j, edit_job, delete_id) in jobs_list.iter().cloned() {
                             div { class: "rounded-md border border-border/30 p-3",
-                                div { class: "flex items-start justify-between gap-2",
+                                div { class: "flex items-center justify-between gap-2",
                                     div {
                                         div { class: "text-sm font-medium text-foreground", "{j.name}" }
                                         div { class: "mt-2 flex flex-wrap gap-1",
                                             for t in j.tags.iter().cloned() {
-                                                span { class: "rounded-full border border-border/40 px-2 py-0.5 text-[10px] text-foreground/80",
+                                                span {
+                                                    class: "rounded-full border border-border/40 px-2 py-0.5 text-[10px] text-foreground/80",
                                                     "{t.name}"
                                                 }
                                             }
                                         }
                                     }
-                                    button {
-                                        class: "shrink-0 rounded border border-border/40 px-2 py-1 text-xs hover:bg-foreground/5",
-                                        onclick: move |_| {
-                                            job_edit.set(Some(j.clone()));
-                                            show_job_form.set(true);
-                                        },
-                                        "Изменить"
+                                    div {
+                                        class: "flex gap-1",
+                                        button {
+                                            class: "rounded border border-border/40 px-2 py-1 text-xs hover:bg-foreground/5",
+                                            onclick: move |_| {
+                                                job_edit.set(Some(edit_job.clone()));
+                                                show_job_form.set(true);
+                                            },
+                                            "Изменить"
+                                        }
+
+                                        button {
+                                            class: "rounded border border-border/40 px-2 py-1 text-xs hover:bg-foreground/5",
+                                            onclick: move |_| {
+                                                delete(delete_id);
+                                                info("Задача успешно удалена".to_string());
+                                            },
+                                            Icon { icon: LdTrash }
+                                        }
                                     }
+
                                 }
                             }
                         }
@@ -632,7 +672,7 @@ fn DailyUsageChart(days: Vec<DayUsage>) -> Element {
                 }
             }
 
-            div { class: "relative flex h-full items-end gap-2 overflow-x-auto overflow-y-visible pb-8 pt-6 overflow-hidden",
+            div { class: "relative flex h-full items-end gap-2 pb-8 pt-6 overflow-hidden",
                 for day in visible_days.into_iter().rev() {
                     DailyUsageBar { day, max_ms }
                 }
@@ -657,12 +697,12 @@ fn DailyUsageBar(day: DayUsage, max_ms: u64) -> Element {
     let idle_height = (bar_height - active_height).max(0.0);
 
     rsx! {
-        div { class: "group relative flex h-[250px] min-w-8 flex-1 flex-col items-center justify-start gap-2",
+        div { class: "group relative flex h-[250px] min-w-8 flex-1 flex-col items-center justify-start gap-2 ",
             
             Tooltip {
                 class: "flex items-end justify-center",
                 align: TooltipAlign::Right,
-                gap: 2,
+                gap: 0,
                 target: rsx! {
                     div { class: "",
                         div { class: "font-semibold text-foreground", "{day.date.format(\"%d.%m.%Y\")}" }

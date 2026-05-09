@@ -44,9 +44,9 @@ pub fn Events() -> Element {
                 variant: TabsVariant::Rounded,
                 value: "timeline".to_string(),
                 TabsList {
-                    class: "sticky top-2 z-100" ,
-                    TabsTrigger { value: "timeline".to_string(), "График" }
-                    TabsTrigger { value: "statistics".to_string(), "Статистика" }
+                    class: "sticky top-1.5 z-100 rounded-md h-[26px]" ,
+                    TabsTrigger { class: "py-0! h-full", value: "timeline".to_string(), "График" }
+                    TabsTrigger { class: "py-0! h-full", value: "statistics".to_string(), "Статистика" }
                 }
 
                 TabsContent {

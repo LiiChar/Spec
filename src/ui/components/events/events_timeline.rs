@@ -11,7 +11,7 @@ use dioxus_free_icons::Icon;
 use crate::{
     config::DATABASE_PATH,
     core::{Database, EventModel, EventType, JobModel, database::database},
-    lib::{convert_ts_to_local_date, merge_events},
+    lib::{convert_ts_to_local_date, merge_events, merge_visual_density},
     ui::{EventElement, JobFormModal, JobModal, use_settings},
 };
 
@@ -222,19 +222,33 @@ fn y_to_timestamp(y: f64, selected_hour: Option<u32>, day_start: u64) -> u64 {
 pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
     let settings = use_settings();
 
+    let mut selected_hour = use_signal(|| None::<u32>);
+    let mut selected_job = use_signal(|| None::<JobModel>);
+
     let day_events = use_memo(move || {
         let show_idle = settings.settings.read().show_idle_events;
 
         let merged = {
             let items = props.events.read();
-            let items = items.iter().filter_map(move |i| {
-                if !show_idle && i.event_type == EventType::Idle {
-                    None
-                } else {
-                    Some(i.clone())
-                }
-            }).collect::<Vec<_>>();
-            merge_events(items)
+
+            let items = items
+                .iter()
+                .filter_map(|i| {
+                    if !show_idle && i.event_type == EventType::Idle {
+                        None
+                    } else {
+                        Some(i.clone())
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            let merged = merge_events(items);
+
+            let px_per_hour = selected_hour()
+                .map(|_| 800.0)
+                .unwrap_or(80.0);
+
+            merge_visual_density(merged, px_per_hour, 3.0)
         };
 
         let segments = group_by_segments(&merged);
@@ -248,8 +262,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
             .collect::<Vec<_>>()
     });
 
-    let mut selected_hour = use_signal(|| None::<u32>);
-    let mut selected_job = use_signal(|| None::<JobModel>);
+
 
     rsx! {
         JobModal {
@@ -310,24 +323,25 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                             .timestamp_millis();
                         let jobs = props.jobs.read();
                         let mut event_jobs: Vec<JobModel> = Vec::new();
+
+                        let segment_st_timestamp =
+                            start_ts + start_hour as i64 * 60 * 60 * 1000;
+
+                        let segment_ed_timestamp =
+                            start_ts + (end_hour as i64 + 1) * 60 * 60 * 1000;
+
                         jobs.iter().for_each(|job| {
-                            let (st_timestamp, ed_timestamp) = if job.start_ts > 86_400 {
+                            let (st_timestamp, ed_timestamp) = if job.start_ts > 86_400_000 {
                                 (
-                                    job.start_ts * 1000,
-                                    job.end_ts * 1000,
+                                    job.start_ts,
+                                    job.end_ts,
                                 )
                             } else {
                                 (
-                                    start_ts + job.start_ts * 1000,
-                                    start_ts + job.end_ts * 1000,
+                                    start_ts + job.start_ts,
+                                    start_ts + job.end_ts,
                                 )
                             };
-
-                            let segment_st_timestamp =
-                                start_ts + start_hour as i64 * 60 * 60 * 1000;
-
-                            let segment_ed_timestamp =
-                                start_ts + (end_hour as i64 + 1) * 60 * 60 * 1000;
 
                             if st_timestamp < segment_ed_timestamp
                                 && ed_timestamp >= segment_st_timestamp
@@ -338,14 +352,14 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
 
                         rsx! {
                             div {
-                                class: "relative",
+                                class: "relative border-dashed border-border/10 border-b-[1px] last:border-b-0",
                                 onclick: move |_| selected_hour.set(Some(start_hour)),
 
                                 style: format!("height: {}px;", height as i32),
 
                                 EventElement {
                                     key: "{start_hour}-{end_hour}",
-                                    class: "h-full border-none!",
+                                    class: "h-full border-none! z-1",
                                     events: segment.group.clone(),
                                     jobs: event_jobs.clone(),
                                     selected_job,
@@ -371,14 +385,25 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
 
                                 // подпись диапазона (если сегмент > 1 часа)
                                 if hour_count > 1 {
-                                    div { class: "absolute left-1 top-1 text-xs opacity-60", "{start_hour}-{end_hour}" }
+                                    div { class: "absolute z-2 left-2 top-1 text-xs opacity-60", "{start_hour}:00-{end_hour}:00" }
                                 } else {
-                                    div { class: "absolute left-1 top-1 text-xs opacity-60", "{start_hour}" }
+                                    div { class: "absolute z-2 left-1 top-1 text-xs opacity-60", "{start_hour}:00" }
+                                }
+
+                                div {
+                                    class: "flex justify-evenly absolute top-0 left-0 h-full w-full z-0",
+                                    {(0..5).map(|i| {
+                                        rsx! {
+                                            div { class: "h-full w-[1px] border-dashed border-border/10 border-l-[1px]" }
+                                        }
+                                    })}
                                 }
                             }
                         }
                     })
             }
+
+            
         }
 
     }

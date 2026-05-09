@@ -36,6 +36,7 @@ dioxus-free-icons = { version = "0.10.0", features = ["lucide"] }
 auto-launch = "0.6.0"
 directories = "6.0.0"
 rusqlite_migration = "2.5.0"
+web-sys = "0.3.98"
 
 
 

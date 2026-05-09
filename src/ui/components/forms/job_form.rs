@@ -11,23 +11,28 @@ use crate::{
 pub struct JobFormProps {
     #[props(default = None)]
     pub job: Option<JobModel>,
-    /// Календарный день для новой задачи (время задаётся отдельно).
+    /// Календарный день для новой задачи.
     pub day: NaiveDate,
-    /// Секунды от полуночи для начала (новая задача).
+    /// Миллисекунды от полуночи для начала.
     pub start_ts: i64,
-    /// Секунды от полуночи для конца (новая задача).
+    /// Миллисекунды от полуночи для конца.
     pub end_ts: i64,
     pub on_save: Callback<JobModel>,
     pub on_cancel: Callback<()>,
 }
 
 fn ts_to_time(ts: i64) -> u32 {
-    let dt = Local.timestamp_opt(ts, 0).single().unwrap();
+    let dt = Local.timestamp_millis_opt(ts).single().unwrap();
     (dt.hour() * 3600 + dt.minute() * 60 + dt.second()) as u32
+}
+
+fn ms_of_day_to_time(ms: i64) -> u32 {
+    (ms / 1000).clamp(0, 86_399) as u32
 }
 
 fn naive_day_start(d: NaiveDate) -> DateTime<Local> {
     let n = d.and_hms_opt(0, 0, 0).unwrap();
+
     Local
         .from_local_datetime(&n)
         .latest()
@@ -44,7 +49,7 @@ fn combine(date: DateTime<Local>, time: u32) -> i64 {
         .from_local_datetime(&dt)
         .latest()
         .unwrap_or_else(|| Local::now())
-        .timestamp()
+        .timestamp_millis()
 }
 
 #[component]
@@ -58,6 +63,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
             .map(|j| j.name.clone())
             .unwrap_or_default()
     });
+
     let mut description = use_signal(|| {
         props
             .job
@@ -65,6 +71,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
             .and_then(|j| j.description.clone())
             .unwrap_or_default()
     });
+
     let mut cron = use_signal(|| {
         props
             .job
@@ -72,6 +79,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
             .and_then(|j| j.cron.clone())
             .unwrap_or_default()
     });
+
     let mut color = use_signal(|| {
         props
             .job
@@ -81,16 +89,18 @@ pub fn JobForm(props: JobFormProps) -> Element {
     });
 
     let day_anchor = props.day;
+
     let mut start_date = use_signal(|| {
         props.job.as_ref().map_or_else(
             || naive_day_start(day_anchor),
-            |j| convert_ts_to_local_date((j.start_ts as i64 * 1000) as u64),
+            |j| convert_ts_to_local_date(j.start_ts as u64),
         )
     });
+
     let mut end_date = use_signal(|| {
         props.job.as_ref().map_or_else(
             || naive_day_start(day_anchor),
-            |j| convert_ts_to_local_date((j.end_ts as i64 * 1000) as u64),
+            |j| convert_ts_to_local_date(j.end_ts as u64),
         )
     });
 
@@ -99,7 +109,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
             .job
             .as_ref()
             .map(|j| ts_to_time(j.start_ts))
-            .unwrap_or(props.start_ts.clamp(0, 86_399) as u32)
+            .unwrap_or_else(|| ms_of_day_to_time(props.start_ts))
     });
 
     let mut end_time = use_signal(|| {
@@ -107,14 +117,20 @@ pub fn JobForm(props: JobFormProps) -> Element {
             .job
             .as_ref()
             .map(|j| ts_to_time(j.end_ts))
-            .unwrap_or(props.end_ts.clamp(0, 86_399) as u32)
+            .unwrap_or_else(|| ms_of_day_to_time(props.end_ts))
     });
 
     let mut tags_line = use_signal(|| {
         props
             .job
             .as_ref()
-            .map(|j| j.tags.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", "))
+            .map(|j| {
+                j.tags
+                    .iter()
+                    .map(|t| t.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
             .unwrap_or_default()
     });
 
@@ -127,7 +143,6 @@ pub fn JobForm(props: JobFormProps) -> Element {
         div {
             class: "space-y-4",
 
-            // NAME
             div {
                 label { class: "text-sm font-medium", "Название*" }
                 input {
@@ -147,7 +162,6 @@ pub fn JobForm(props: JobFormProps) -> Element {
                 }
             }
 
-            // TIME
             div {
                 class: "flex gap-2",
 
@@ -164,7 +178,6 @@ pub fn JobForm(props: JobFormProps) -> Element {
                 }
             }
 
-            // CRON + COLOR
             div {
                 class: "flex gap-2",
 
@@ -179,8 +192,14 @@ pub fn JobForm(props: JobFormProps) -> Element {
                     color: color,
                     onselect: move |c: String| {
                         color.set(c.clone());
-                        
-                        document::eval(format!("document.querySelector('.job-modal-refw').style.outline = '2px solid {}';", c).as_str());
+
+                        document::eval(
+                            format!(
+                                "document.querySelector('.job-modal-refw').style.outline = '2px solid {}';",
+                                c
+                            )
+                            .as_str()
+                        );
                     },
                 }
             }
@@ -229,15 +248,18 @@ pub fn JobForm(props: JobFormProps) -> Element {
                     job.start_ts = start_ts;
                     job.end_ts = end_ts;
                     job.color = color();
+
                     job.description = if description().trim().is_empty() {
                         None
                     } else {
                         Some(description().trim().to_string())
                     };
 
-                    if !cron().trim().is_empty() {
-                        job.cron = Some(cron().trim().to_string());
-                    }
+                    job.cron = if cron().trim().is_empty() {
+                        None
+                    } else {
+                        Some(cron().trim().to_string())
+                    };
 
                     job.tags = tags_line()
                         .split(',')

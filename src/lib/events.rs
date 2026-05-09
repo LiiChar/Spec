@@ -1,12 +1,14 @@
 use crate::core::EventModel;
 
 const DIRECT_MERGE_GAP_MS: u64 = 10_000;
-const BRIDGE_GAP_MS: u64 = 15_000;
 const NOISE_EVENT_MAX_MS: u64 = 90_000;
-const MIN_STABLE_SEGMENT_MS: u64 = 180_000;
 
-// новое
-const MAX_NOISE_CHAIN: usize = 2;
+const MAX_BRIDGE_TOTAL_MS: u64 = 60_000;
+const MAX_BRIDGE_EVENTS: usize = 4;
+
+const DOMINANT_WINDOW_MS: u64 = 4 * 60_000;
+const DOMINANT_MIN_SHARE: f32 = 0.72;
+const DOMINANT_IGNORE_EVENT_MS: u64 = 25_000;
 
 pub fn merge_events(events: Vec<EventModel>) -> Vec<EventModel> {
     if events.is_empty() {
@@ -19,10 +21,10 @@ pub fn merge_events(events: Vec<EventModel>) -> Vec<EventModel> {
     loop {
         let before = current.clone();
 
-        // важно: сначала чистим мусор
+        current = merge_adjacent(current);
         current = merge_bridge_noise(current);
-
-        // потом склеиваем соседние
+        current = merge_adjacent(current);
+        current = merge_dominant_windows(current);
         current = merge_adjacent(current);
 
         if current == before {
@@ -34,7 +36,11 @@ pub fn merge_events(events: Vec<EventModel>) -> Vec<EventModel> {
 }
 
 fn merge_adjacent(events: Vec<EventModel>) -> Vec<EventModel> {
-    let mut result: Vec<EventModel> = Vec::with_capacity(events.len());
+    if events.is_empty() {
+        return events;
+    }
+
+    let mut result = Vec::with_capacity(events.len());
 
     for event in events {
         if let Some(last) = result.last_mut() {
@@ -43,6 +49,7 @@ fn merge_adjacent(events: Vec<EventModel>) -> Vec<EventModel> {
                 continue;
             }
         }
+
         result.push(event);
     }
 
@@ -59,30 +66,46 @@ fn merge_bridge_noise(events: Vec<EventModel>) -> Vec<EventModel> {
 
     while i < events.len() {
         let mut base = events[i].clone();
-        let mut j = i;
-        let mut noise_count = 0;
 
-        let mut merged_any = false;
+        let mut bridge_duration = 0;
+        let mut bridge_count = 0;
+        let mut found = None;
 
-        while j + 2 < events.len() && noise_count < MAX_NOISE_CHAIN {
-            let middle = &events[j + 1];
-            let next = &events[j + 2];
+        let mut j = i + 1;
 
-            if should_absorb_middle(&base, middle, next) {
-                merge_into(&mut base, middle);
-                merge_into(&mut base, next);
+        while j < events.len() {
+            let current = &events[j];
 
-                j += 2;
-                noise_count += 1;
-                merged_any = true;
-            } else {
+            if same_signature(&base, current) {
+                found = Some(j);
                 break;
             }
+
+            if current.duration > NOISE_EVENT_MAX_MS {
+                break;
+            }
+
+            bridge_duration += current.duration;
+            bridge_count += 1;
+
+            if bridge_duration > MAX_BRIDGE_TOTAL_MS {
+                break;
+            }
+
+            if bridge_count > MAX_BRIDGE_EVENTS {
+                break;
+            }
+
+            j += 1;
         }
 
-        if merged_any {
+        if let Some(end_idx) = found {
+            for k in i + 1..=end_idx {
+                merge_into(&mut base, &events[k]);
+            }
+
             result.push(base);
-            i = j + 1;
+            i = end_idx + 1;
         } else {
             result.push(events[i].clone());
             i += 1;
@@ -92,64 +115,133 @@ fn merge_bridge_noise(events: Vec<EventModel>) -> Vec<EventModel> {
     result
 }
 
-fn should_absorb_middle(prev: &EventModel, middle: &EventModel, next: &EventModel) -> bool {
-    // края должны совпадать
-    if !same_signature(prev, next) {
-        return false;
+fn merge_dominant_windows(events: Vec<EventModel>) -> Vec<EventModel> {
+    if events.len() < 2 {
+        return events;
     }
 
-    // middle должен отличаться
-    if same_signature(prev, middle) || same_signature(middle, next) {
-        return false;
+    let mut result = Vec::new();
+    let mut i = 0;
+
+    while i < events.len() {
+        let window_start = events[i].timestamp;
+        let window_end = window_start + DOMINANT_WINDOW_MS;
+
+        let mut j = i;
+        while j < events.len() && events[j].timestamp < window_end {
+            j += 1;
+        }
+
+        if j - i <= 1 {
+            result.push(events[i].clone());
+            i += 1;
+            continue;
+        }
+
+        let slice = &events[i..j];
+
+        if let Some(dominant_sig) = dominant_signature(slice) {
+            let mut merged: Option<EventModel> = None;
+
+            for ev in slice {
+                if signature_of(ev) == dominant_sig {
+                    if let Some(ref mut m) = merged {
+                        merge_into(m, ev);
+                    } else {
+                        merged = Some(ev.clone());
+                    }
+                } else if ev.duration > DOMINANT_IGNORE_EVENT_MS {
+                    if let Some(m) = merged.take() {
+                        result.push(m);
+                    }
+
+                    result.push(ev.clone());
+                }
+            }
+
+            if let Some(m) = merged {
+                result.push(m);
+            }
+
+            i = j;
+        } else {
+            result.push(events[i].clone());
+            i += 1;
+        }
     }
 
-    // слишком длинный шум — не трогаем
-    if middle.duration > NOISE_EVENT_MAX_MS {
-        return false;
+    result
+}
+
+fn dominant_signature(slice: &[EventModel]) -> Option<String> {
+    use std::collections::HashMap;
+
+    let mut totals: HashMap<String, u64> = HashMap::new();
+    let mut total = 0u64;
+
+    for ev in slice {
+        let sig = signature_of(ev);
+        *totals.entry(sig).or_default() += ev.duration;
+        total += ev.duration;
     }
 
-    // оба края слабые → не мержим
-    if prev.duration < MIN_STABLE_SEGMENT_MS && next.duration < MIN_STABLE_SEGMENT_MS {
-        return false;
+    if total == 0 {
+        return None;
     }
 
-    let gap_before = gap(prev, middle);
-    let gap_after = gap(middle, next);
+    totals
+        .into_iter()
+        .max_by_key(|(_, duration)| *duration)
+        .and_then(|(sig, duration)| {
+            let share = duration as f32 / total as f32;
 
-    gap_before <= BRIDGE_GAP_MS && gap_after <= BRIDGE_GAP_MS
+            if share >= DOMINANT_MIN_SHARE {
+                Some(sig)
+            } else {
+                None
+            }
+        })
 }
 
 fn can_merge_direct(a: &EventModel, b: &EventModel) -> bool {
-    if b.timestamp < a.timestamp {
-        return false;
-    }
-
     if !same_signature(a, b) {
         return false;
     }
 
-    // 🔥 новое: защита от overlap
     if overlaps(a, b) {
-        return true; // пересечения считаем тем же сегментом
+        return true;
     }
 
     gap(a, b) <= DIRECT_MERGE_GAP_MS
 }
 
 fn overlaps(a: &EventModel, b: &EventModel) -> bool {
-    end_ts(a) > b.timestamp
+    end_ts(a) >= b.timestamp
 }
 
 fn same_signature(a: &EventModel, b: &EventModel) -> bool {
-    if a.event_type != b.event_type {
-        return false;
-    }
+    signature_of(a) == signature_of(b)
+}
 
-    match (&a.window, &b.window) {
-        (Some(l), Some(r)) => l.process_name == r.process_name,
-        (None, None) => true,
-        _ => false,
+fn signature_of(event: &EventModel) -> String {
+    let event_type = format!("{:?}", event.event_type);
+
+    match &event.window {
+        Some(window) => {
+            let title = window.title.clone();
+            format!("{}:{}:{}", event_type, window.process_name, normalize_title(&title))
+        }
+        None => event_type,
     }
+}
+
+fn normalize_title(title: &str) -> String {
+    title
+        .trim()
+        .to_lowercase()
+        .chars()
+        .take(80)
+        .collect()
 }
 
 fn merge_into(target: &mut EventModel, incoming: &EventModel) {
@@ -166,4 +258,34 @@ fn end_ts(e: &EventModel) -> u64 {
 
 fn gap(a: &EventModel, b: &EventModel) -> u64 {
     b.timestamp.saturating_sub(end_ts(a))
+}
+
+pub fn merge_visual_density(
+    events: Vec<EventModel>,
+    px_per_hour: f64,
+    min_px: f64,
+) -> Vec<EventModel> {
+    if events.len() < 2 {
+        return events;
+    }
+
+    let ms_per_px = 3_600_000.0 / px_per_hour;
+    let min_duration = (ms_per_px * min_px) as u64;
+
+    let mut result: Vec<EventModel> = Vec::with_capacity(events.len());
+
+    for event in events {
+        if event.duration >= min_duration {
+            result.push(event);
+            continue;
+        }
+
+        if let Some(last) = result.last_mut() {
+            merge_into(last, &event);
+        } else {
+            result.push(event);
+        }
+    }
+
+    result
 }

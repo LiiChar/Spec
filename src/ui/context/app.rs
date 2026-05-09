@@ -63,6 +63,28 @@ impl AppProvider {
             }
         });
     }
+    pub fn delete_job(&self, id: i64) {
+        let mut ctx_job: Signal<Vec<JobModel>> = self.jobs;
+        spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                with_database_mut(|db| {
+                    db.delete_job(id).map(|_| ())
+                })
+            })
+            .await;
+
+            match result {
+                Ok(Ok(_)) => {
+                    if let Ok(jobs) = with_database(|db| db.get_jobs()) {
+                       ctx_job.set(jobs);
+                    }
+                    println!("Deleted job id: {}", id);
+                }
+                Ok(Err(e)) => println!("DB error: {:?}", e),
+                Err(e) => println!("Task error: {:?}", e),
+            }
+        });
+    }
     pub fn update_goal(&self, goal: GoalModel) {
         let mut ctx_goals: Signal<Vec<GoalModel>> = self.goals;
         let name = goal.name.clone();

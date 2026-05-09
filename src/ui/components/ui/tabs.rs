@@ -60,7 +60,7 @@ pub fn TabsList(props: ChildrenProps) -> Element {
     let ctx = use_context::<TabsContext>();
 
     let class = match ctx.variant {
-        TabsVariant::Default => "gap-2 border-b border-border/40",
+        TabsVariant::Default => "border-b border-border/40",
         TabsVariant::Rounded => {
             "border border-border/20 rounded-lg bg-secondary/20 backdrop-blur-md"
         }
@@ -78,8 +78,8 @@ pub fn TabsTrigger(props: TabsTriggerProps) -> Element {
     let active = (ctx.value)() == props.value;
 
     let class = match ctx.variant {
-        TabsVariant::Default => format!("px-3 py-2 text-sm border-b-2 {}", if active { "border-primary text-primary" } else { "border-transparent" }),
-        TabsVariant::Rounded => format!("px-1.5 py-1 text-sm border border-transparent rounded-none last:rounded-l-none first:rounded-r-none hover:bg-secondary/30 {}", if active { "border-primary text-primary bg-secondary/40" } else { "bg-transparent" }),
+        TabsVariant::Default => format!("px-2 py-0.5 text-sm border-b-2 {} {}", if active { "border-primary text-primary" } else { "border-transparent" }, props.class),
+        TabsVariant::Rounded => format!("px-1.5 py-1 text-sm border border-transparent rounded-none last:rounded-l-none first:rounded-r-none hover:bg-secondary/30 {} {}", if active { "border-primary text-primary bg-secondary/40" } else { "bg-transparent" }, props.class),
     };
 
     rsx! {

@@ -34,10 +34,84 @@ pub fn sort_by_duration(a: &JobModel, b: &JobModel) -> Ordering {
     (&b.end_ts - &b.start_ts).cmp(&((&a.end_ts - &a.start_ts)))
 }
 
+fn event_range_in_segment(
+    event: &EventModel,
+    start_hour: u32,
+    end_hour: u32,
+) -> (f32, f32) {
+    let start_dt = convert_ts_to_local_date(event.timestamp);
+
+    let duration_sec = event.duration as f32 / 1000.0;
+    let total_hours = (end_hour - start_hour + 1) as f32;
+    let total_seconds = total_hours * 3600.0;
+
+    let event_start_sec =
+        (start_dt.hour() - start_hour) as f32 * 3600.0
+            + start_dt.minute() as f32 * 60.0
+            + start_dt.second() as f32;
+
+    let offset = (event_start_sec / total_seconds) * 100.0;
+    let size = (duration_sec / total_seconds) * 100.0;
+
+    (offset, size.max(0.05))
+}
+
+fn overlaps_percent(
+    a_start: f32,
+    a_size: f32,
+    b_start: f32,
+    b_size: f32,
+) -> bool {
+    let a_end = a_start + a_size;
+    let b_end = b_start + b_size;
+
+    a_start < b_end && b_start < a_end
+}
+
+fn compute_event_lanes(
+    events: &[EventModel],
+    start_hour: u32,
+    end_hour: u32,
+) -> Vec<usize> {
+    if events.is_empty() {
+        return Vec::new();
+    }
+
+    let mut lanes: Vec<Vec<(f32, f32)>> = Vec::new();
+    let mut result = Vec::with_capacity(events.len());
+
+    for event in events {
+        let (offset, size) = event_range_in_segment(event, start_hour, end_hour);
+
+        let mut placed = false;
+
+        for (lane_index, lane) in lanes.iter_mut().enumerate() {
+            let intersects = lane.iter().any(|(other_offset, other_size)| {
+                overlaps_percent(offset, size, *other_offset, *other_size)
+            });
+
+            if !intersects {
+                lane.push((offset, size));
+                result.push(lane_index);
+                placed = true;
+                break;
+            }
+        }
+
+        if !placed {
+            lanes.push(vec![(offset, size)]);
+            result.push(lanes.len() - 1);
+        }
+    }
+
+    result
+}
+
 #[component]
 pub fn EventElement(props: EventsElementProps) -> Element {
     let app = use_app();
     let mut jobs = props.jobs.clone();
+    let orientation = props.orientation.clone();
 
     jobs.sort_by(sort_by_duration);
 
@@ -48,11 +122,13 @@ pub fn EventElement(props: EventsElementProps) -> Element {
         now >= props.start_hour && now <= props.end_hour
     };
 
+    let mut count_job = use_signal(|| jobs.len());
+
     rsx! {
         div {
             class: format!(
                 " w-full h-full relative transition-all duration-200 border border-border/70 {} {} {} {}",
-                if props.orientation == TimelineOrientation::Horizontal {
+                if orientation == TimelineOrientation::Horizontal {
                     "max-w-[calc(100%/24)] max-h-full"
                 } else {
                     "max-w-full"
@@ -65,7 +141,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                 if is_current_hour { "current-hour" } else { "" },
                 props.class,
             ),
-            style: match props.orientation {
+            style: match orientation {
                 TimelineOrientation::Vertical => format!("{}", props.style),
                 TimelineOrientation::Horizontal => props.style.clone(),
             },
@@ -76,10 +152,10 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                     .into_iter()
                     .enumerate()
                     .filter_map(|(i, job)| {
-                        let range_start = props.start_hour * 3600;
-                        let range_end = (props.end_hour + 1) * 3600;
+                        let range_start = (props.start_hour * 3_600_000) as i64;
+                        let range_end = ((props.end_hour + 1) * 3_600_000) as i64;
 
-                        let (mut start_sec, mut end_sec) = if job.start_ts > 86_400 {
+                        let (start_ms, mut end_ms) = if job.start_ts > 86_400_000 {
                             let day_start = app
                                 .day
                                 .read()
@@ -88,7 +164,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                 .unwrap()
                                 .and_local_timezone(chrono::Local)
                                 .unwrap()
-                                .timestamp();
+                                .timestamp_millis();
 
                             (
                                 job.start_ts - day_start,
@@ -98,22 +174,24 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                             (job.start_ts, job.end_ts)
                         };
 
-                        if end_sec < start_sec {
-                            end_sec += 86400;
+                        if end_ms < start_ms {
+                            end_ms += 86_400_000;
                         }
 
-                        let clamped_start = start_sec.max(range_start as i64);
-                        let clamped_end = end_sec.min(range_end as i64);
+                        let clamped_start = start_ms.max(range_start);
+                        let clamped_end = end_ms.min(range_end);
 
                         if clamped_end < clamped_start {
                             return None;
                         }
 
-                        let duration_sec = (clamped_end - clamped_start).max(1) as f32;
-                        let total_seconds = (range_end - range_start) as f32;
-                        let event_start_sec = (clamped_start - range_start as i64) as f32;
-                        let offset = (event_start_sec / total_seconds) * 100.0;
-                        let size = (duration_sec / total_seconds) * 100.0;
+                        let duration_ms = (clamped_end - clamped_start).max(1) as f32;
+                        let total_ms = (range_end - range_start) as f32;
+                        let event_start_ms = (clamped_start - range_start) as f32;
+
+                        let offset = (event_start_ms / total_ms) * 100.0;
+                        let size = (duration_ms / total_ms) * 100.0;
+
                         let is_select = match props.selected_job.read().clone() {
                             Some(j) => {
                                 format!("{}{}{}", job.name, job.start_ts, job.end_ts)
@@ -121,11 +199,13 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                             }
                             None => false,
                         };
-                        let has_prev = start_sec < range_start.into();
-                        let has_next = end_sec > range_end.into();
-                        
+
+                        let has_prev = start_ms < range_start;
+                        let has_next = end_ms > range_end;
+
                         Some({
                             let value = job.clone();
+
                             rsx! {
                                 div {
                                     onclick: move |evt| {
@@ -136,13 +216,13 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                         selected_job.set(None);
                                     },
                                     class: format!(
-                                        "absolute group w-1 z-100  cursor-pointer transition-all overflow-hidden {} {}",
+                                        "absolute group w-1 z-100 cursor-pointer transition-all overflow-hidden {} {}",
                                         has_prev.then(|| "").unwrap_or("rounded-tl-sm"),
                                         has_next.then(|| "").unwrap_or("rounded-bl-sm"),
                                     ),
                                     style: format!(
                                         "{} background-color: {};",
-                                        match props.orientation {
+                                        match orientation {
                                             TimelineOrientation::Vertical => {
                                                 format!(
                                                     "top: {}%; height: {}%; width: {}; right: {}px;",
@@ -175,16 +255,34 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                 }
                             }
                         })
-                })
+                    })
             }
 
             {
-                props
-                    .events
+                let mut events = props.events.clone();
+
+                // длинные сначала
+                events.sort_by(|a, b| b.duration.cmp(&a.duration));
+
+                let lanes = compute_event_lanes(
+                    &events,
+                    props.start_hour,
+                    props.end_hour,
+                );
+
+                let lane_count = lanes.iter().copied().max().unwrap_or(0) + 1;
+
+                events
+                    .clone()
                     .iter()
-                    .map(|event| {
+                    .enumerate()
+                    .map(move |(index, event)| {
+                        let lanes_c = lanes.clone();
+                        let lane_count_c = lane_count.clone();
+
                         let start_dt = convert_ts_to_local_date(event.timestamp);
-                        let end_dt = start_dt + chrono::Duration::milliseconds(event.duration as i64);
+                        let end_dt =
+                            start_dt + chrono::Duration::milliseconds(event.duration as i64);
 
                         let time_range = format!(
                             "{} - {}",
@@ -195,12 +293,14 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         let duration_formatted = format_duration_short(event.duration);
 
                         let duration_sec = event.duration as f32 / 1000.0;
-                        let total_hours = (props.end_hour - props.start_hour + 1) as f32;
+                        let total_hours =
+                            (props.end_hour - props.start_hour + 1) as f32;
                         let total_seconds = total_hours * 3600.0;
 
-                        let event_start_sec = (start_dt.hour() - props.start_hour) as f32 * 3600.0
-                            + start_dt.minute() as f32 * 60.0
-                            + start_dt.second() as f32;
+                        let event_start_sec =
+                            (start_dt.hour() - props.start_hour) as f32 * 3600.0
+                                + start_dt.minute() as f32 * 60.0
+                                + start_dt.second() as f32;
 
                         let offset = (event_start_sec / total_seconds) * 100.0;
                         let size = (duration_sec / total_seconds) * 100.0;
@@ -208,17 +308,18 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         let window_info = event.window.as_ref();
 
                         let process_name = window_info
-                            .map(|window| window.process_name.clone())
+                            .map(|w| w.process_name.clone())
                             .unwrap_or_else(|| "Unknown".to_string());
 
-                        let short_process_name: String = process_name.chars().take(10).collect();
+                        let short_process_name: String =
+                            process_name.chars().take(10).collect();
 
                         let window_title = window_info
-                            .map(|window| window.title.clone())
+                            .and_then(|w| Some(w.title.clone()))
                             .unwrap_or_else(|| "N/A".to_string());
 
                         let pid_str = window_info
-                            .map(|window| window.pid.to_string())
+                            .map(|w| w.pid.to_string())
                             .unwrap_or_else(|| "0".to_string());
 
                         let mut color = get_process_color(&process_name).to_owned();
@@ -227,80 +328,154 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                             color += "/50";
                         }
 
-                        // размер дорожки в пикселях
                         let track_px = match props.orientation {
-                            TimelineOrientation::Vertical => if props.is_selected { 800.0 } else { 80.0 },
-                            TimelineOrientation::Horizontal => if props.is_selected { 800.0 } else { 80.0 },
+                            TimelineOrientation::Vertical => {
+                                if props.is_selected { 800.0 } else { 80.0 }
+                            }
+                            TimelineOrientation::Horizontal => {
+                                if props.is_selected { 800.0 } else { 80.0 }
+                            }
                         };
 
-                        // фактический размер события в пикселях
                         let event_px = (size / 100.0) * track_px;
 
-                        const SHORT_LABEL_MIN_PX: f32 = 9.0;
-                        const FULL_LABEL_MIN_PX: f32 = 9.0;
-                        const DURATION_MIN_PX: f32 = 9.0;
+                        const DOT_THRESHOLD: f32 = 3.0;
+                        const SHORT_LABEL_THRESHOLD: f32 = 11.0;
+                        const FULL_LABEL_THRESHOLD: f32 = 18.0;
+                        const DURATION_THRESHOLD: f32 = 26.0;
 
-                        let main_label = if event_px >= FULL_LABEL_MIN_PX {
+                        let is_micro = event_px < DOT_THRESHOLD;
+
+                        let label = if event_px >= FULL_LABEL_THRESHOLD {
                             Some(process_name.clone())
-                        } else if event_px >= SHORT_LABEL_MIN_PX {
+                        } else if event_px >= SHORT_LABEL_THRESHOLD {
                             Some(short_process_name)
                         } else {
                             None
                         };
 
-                        let has_main_label = main_label.is_some();
-                        let show_duration = event_px >= DURATION_MIN_PX;
+                        let lane = lanes_c[index];
+                        let lane_thickness = 100.0 / lane_count_c as f32;
+
+                        let is_idle = event.event_type == EventType::Idle;
+
                         rsx! {
-                             div {
+                            div {
                                 key: "{event.timestamp}-{event.duration}-{pid_str}",
+
                                 class: format!(
-                                    "timeline-event absolute group left-0 right-0 {} cursor-pointer transition-all overflow-visible",
-                                    color,
+                                    "timeline-event left-1 right-1 absolute group cursor-pointer transition-all overflow-visible rounded-[2px] {}",
+                                    color
                                 ),
-                                style: match props.orientation {
+
+                                style: format!("{} {}",match props.orientation {
                                     TimelineOrientation::Vertical => {
-                                        format!("top: {}%; height: {}%; width: 100%;", offset, size.max(0.5))
+                                        if is_micro {
+                                            format!(
+                                                "top:{}%; height:2px;",
+                                                offset,
+                                            )
+                                        } else {
+                                            format!(
+                                                "top:{}%; height:{}%;",
+                                                offset,
+                                                size.max(0.7),
+                                            )
+                                        }
                                     }
                                     TimelineOrientation::Horizontal => {
-                                        format!("left: {}%; width: {}%; height: 100%;", offset, size.max(0.5))
+                                        if is_micro {
+                                            format!(
+                                                "left:{}%; width:2px;",
+                                                offset,
+                                            )
+                                        } else {
+                                            format!(
+                                                "left:{}%; width:{}%;",
+                                                offset,
+                                                size.max(0.7),
+                                            )
+                                        }
                                     }
-                                },
+                                }, 
+                                    format!("left: {}px; right: {}px;", 
+                                        if is_current_hour  {
+                                            6
+                                        } else {
+                                            3
+                                        },
+                                        (count_job() + 1) * 3
+                                    )
+                                ),
+
                                 Tooltip {
                                     align: TooltipAlign::Top,
                                     at_cursor: true,
                                     target: Some({
                                         rsx! {
                                             div {
-                                                class: "p-2 text-xs whitespace-nowrap ",
+                                                class: "p-2 text-xs whitespace-nowrap",
                                                 style: "min-width: 220px; max-width: 320px;",
 
-                                                div { class: "font-bold text-cyan-400", "{process_name}" }
-                                                div { class: "text-gray-300 overflow-hidden text-ellipsis", "{window_title}" }
-                                                div { class: "text-gray-300", "{time_range}" }
-                                                div { class: "text-amber-300", "{duration_formatted}" }
+                                                div {
+                                                    class: "absolute top-0 left-0 h-full w-3",
+                                                    style: format!("border-left: 1px solid {};", color)
+                                                }
+
+                                                div {
+                                                    class: "font-bold text-cyan-400",
+                                                    "{process_name}"
+                                                }
+
+                                                div {
+                                                    class: "text-gray-300 overflow-hidden text-ellipsis",
+                                                    "{window_title}"
+                                                }
+
+                                                div {
+                                                    class: "text-gray-300",
+                                                    "{time_range}"
+                                                }
+
+                                                div {
+                                                    class: "text-amber-300",
+                                                    "{duration_formatted}"
+                                                }
                                             }
                                         }
                                     })
                                 }
 
-                                if main_label.is_some() || show_duration {
-                                    div { class: "absolute inset-0 flex flex-row gap-2  items-center justify-center text-center pointer-events-none",
+                                if !is_micro && lane == 0 && label.is_some() {
+                                    div {
+                                        class: "absolute inset-0 left-8 right-4 px-1 flex items-center justify-center pointer-events-none select-none text-[10px]",
+                                        div {
+                                            class: "flex gap-1 items-center w-full justify-between pointer-events-none select-none",
 
-                                        if let Some(label) = main_label {
-                                            span { class: if size >= 10.0 { "max-w-full truncate whitespace-nowrap text-[10px] font-semibold text-white/90 leading-none" } else { "max-w-full truncate whitespace-nowrap text-[9px] font-medium text-white/85 leading-none" },
-                                                "{label}"
+                                            if let Some(label) = label {
+                                                div {
+                                                    class: "flex gap-1 items-center justify-center",
+                                                    div {
+                                                        class: format!("w-1 h-1 rounded-full bg-primary transition-all {}",
+                                                            if is_idle {
+                                                                "bg-gray-500"
+                                                            } else {
+                                                                ""
+                                                            }
+                                                        ),
+                                                    }
+                                                    span {
+                                                        class: "truncate whitespace-nowrap font-medium text-white/90 leading-none",
+                                                        "{label}"
+                                                    }
+                                                }
                                             }
-                                        }
-
-                                        if show_duration {
-                                            div { "-" }
                                             span {
-                                                class: format!(
-                                                    "max-w-full truncate whitespace-nowrap text-[8px] leading-none text-white/80",
-                                                ),
+                                                class: "whitespace-nowrap",
                                                 "{duration_formatted}"
                                             }
                                         }
+
                                     }
                                 }
                             }

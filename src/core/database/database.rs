@@ -178,6 +178,7 @@ impl Database {
         self.ensure_column(
             "goals",
             "name",
+            
             "ALTER TABLE goals ADD COLUMN name TEXT NOT NULL DEFAULT ''",
         )?;
 
@@ -542,6 +543,12 @@ impl Database {
         Ok(self.conn.last_insert_rowid())
     }
 
+    pub fn delete_job(&self, id: i64) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM jobs WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
     pub fn update_job(&self, job: &JobModel) -> Result<()> {
         let process_paths = job
             .proccess_path
@@ -778,6 +785,7 @@ impl Database {
 
         tx.commit()
     }
+    
 
     fn row_to_event(row: &rusqlite::Row) -> Result<EventModel> {
         let hwnd: Option<i64> = row.get(0).ok();
