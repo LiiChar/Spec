@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::lib::{load_settings, save_settings};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Theme {
+    #[default]
     Light,
     Dark,
 }
@@ -16,11 +17,43 @@ impl Theme {
             Theme::Dark => "dark",
         }
     }
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "light" => Some(Theme::Light),
+            "dark" => Some(Theme::Dark),
+            _ => None,
+        }
+    }
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Language {
+    #[default]
+    Russian,
+    English,
+}
+
+impl Language {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Language::Russian => "russian",
+            Language::English => "english",
+        }
+    }
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "russian" => Some(Language::Russian),
+            "english" => Some(Language::English),
+            _ => None,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub theme: Theme,
+    pub language: Language,
     pub enable_notifications: bool,
     pub notification_delay_ms: u64,
     pub db_flush_interval_ms: u64,
@@ -31,12 +64,15 @@ pub struct Settings {
     pub idle_threshold: u32,
     pub event_duration: u32,
     pub report_interval: u64,
+    pub show_apps: bool,
+    pub save_data: bool
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: Theme::Dark,
+            language: Language::Russian,
             enable_notifications: true,
             notification_delay_ms: 1500,
             db_flush_interval_ms: 750,
@@ -46,7 +82,9 @@ impl Default for Settings {
             auto_start_tracking: true,
             event_duration: 60,
             idle_threshold: 250,
-            report_interval: 5000
+            report_interval: 5000,
+            show_apps: true,
+            save_data: true
         }
     }
 }
@@ -84,6 +122,10 @@ impl SettingsState {
         self.mutate(|s| s.theme = theme);
     }
 
+    pub fn set_language(&mut self, language: Language) {
+        self.mutate(|s| s.language = language);
+    }
+
     pub fn set_notifications(&mut self, v: bool) {
         self.mutate(|s| s.enable_notifications = v);
     }
@@ -114,6 +156,14 @@ impl SettingsState {
 
     pub fn set_auto_start_tracking(&mut self, v: bool) {
         self.mutate(|s| s.auto_start_tracking = v);
+    }
+
+    pub fn set_save_data(&mut self, v: bool) {
+        self.mutate(|s| s.save_data = v);
+    }
+
+    pub fn set_show_apps(&mut self, v: bool) {
+        self.mutate(|s| s.show_apps = v);
     }
 }
 

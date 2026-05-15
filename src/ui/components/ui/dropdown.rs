@@ -17,10 +17,11 @@ pub fn Dropdown(children: Element) -> Element {
 #[component]
 pub fn DropdownTrigger(children: Element) -> Element {
     let ctx = use_context::<DropdownContext>();
-
+    let mut is_open = ctx.open.clone();
+    let open = ctx.open.read().clone();
     rsx! {
         div {
-            onclick: move |_| ctx.open.set(!ctx.open()),
+            onclick: move |_| is_open.set(!open),
             class: "cursor-pointer",
             {children}
         }
@@ -31,7 +32,7 @@ pub fn DropdownTrigger(children: Element) -> Element {
 pub fn DropdownContent(children: Element) -> Element {
     let ctx = use_context::<DropdownContext>();
 
-    if !ctx.open() {
+    if !ctx.open.read().clone() {
         return rsx! {};
     }
 
@@ -52,13 +53,15 @@ pub fn DropdownItem(
     #[props(optional)] onclick: Option<EventHandler<MouseEvent>>,
 ) -> Element {
     let ctx = use_context::<DropdownContext>();
+    let mut is_open = ctx.open.clone();
+
 
     rsx! {
         div {
             class: "px-3 py-2 hover:bg-foreground/5 rounded cursor-pointer",
 
             onclick: move |e| {
-                ctx.open.set(false);
+                is_open.set(false);
                 if let Some(handler) = &onclick {
                     handler.call(e);
                 }

@@ -15,7 +15,7 @@ pub fn Navigate() -> Element {
     rsx! {
         div {
             class: "fixed z-100 bottom-3 right-3 flex flex-col gap-1 p-1  items-center rounded-full bg-secondary/40 backdrop-blur-lg",
-            div {
+            button {
               onclick: move |_| {
                 let t_visible = visible.read().clone();
                 visible.set(!t_visible);

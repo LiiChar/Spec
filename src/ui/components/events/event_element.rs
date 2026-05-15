@@ -5,7 +5,7 @@ use dioxus::prelude::*;
 
 use crate::{
     core::{EventModel, EventType, JobModel},
-    lib::{convert_ts_to_local_date, format_duration_short, get_process_color},
+    lib::{CronExpr, convert_ts_to_local_date, format_duration_short, get_process_color},
     ui::{TimelineOrientation, Tooltip, TooltipAlign, use_app},
 };
 
@@ -155,23 +155,47 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         let range_start = (props.start_hour * 3_600_000) as i64;
                         let range_end = ((props.end_hour + 1) * 3_600_000) as i64;
 
-                        let (start_ms, mut end_ms) = if job.start_ts > 86_400_000 {
-                            let day_start = app
-                                .day
-                                .read()
-                                .date_naive()
-                                .and_hms_opt(0, 0, 0)
-                                .unwrap()
-                                .and_local_timezone(chrono::Local)
-                                .unwrap()
-                                .timestamp_millis();
+                        let (start_ms, mut end_ms) = {
+                            let default_start = convert_ts_to_local_date(job.start_ts as u64);
+                            let default_end = convert_ts_to_local_date(job.end_ts as u64);
 
-                            (
-                                job.start_ts - day_start,
-                                job.end_ts - day_start,
-                            )
-                        } else {
-                            (job.start_ts, job.end_ts)
+                            let cron = job.cron.as_ref()
+                                .and_then(|c| CronExpr::parse(c).ok());
+
+                            let (h_start, h_end, m_start, m_end, s_start, s_end) = if let Some(cron) = cron {
+                                let c_h = cron.hour;
+                                let c_m = cron.minute;
+                                let c_s = cron.second;
+
+                                let parse_or_range = |field: crate::lib::Field, def: u32| match field {
+                                    crate::lib::Field::Range(s, e) => (s, e),
+                                    _ => (def, def),
+                                };
+
+                                let (hs, he) = parse_or_range(c_h, default_start.hour() as u32);
+                                let (ms, me) = parse_or_range(c_m, default_start.minute() as u32);
+                                let (ss, se) = parse_or_range(c_s, default_start.second() as u32);
+
+                                (hs, he, ms, me, ss, se)
+                            } else {
+                                (
+                                    default_start.hour() as u32,
+                                    default_end.hour() as u32,
+                                    default_start.minute() as u32,
+                                    default_end.minute() as u32,
+                                    default_start.second() as u32,
+                                    default_end.second() as u32,
+                                )
+                            };
+
+                            let build_ms = |h: u32, m: u32, s: u32| {
+                                ((h as i64) * 3600 + (m as i64) * 60 + (s as i64)) * 1000
+                            };
+
+                            let start = build_ms(h_start, m_start, s_start);
+                            let end = build_ms(h_end, m_end, s_end);
+
+                            (start, end)
                         };
 
                         if end_ms < start_ms {
@@ -361,7 +385,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
 
                         rsx! {
                             div {
-                                key: "{event.timestamp}-{event.duration}-{pid_str}",
+                                key: "{event.timestamp}",
 
                                 class: format!(
                                     "timeline-event left-1 right-1 absolute group cursor-pointer transition-all overflow-visible rounded-[2px] {}",
@@ -414,32 +438,33 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     target: Some({
                                         rsx! {
                                             div {
-                                                class: "p-2 text-xs whitespace-nowrap",
-                                                style: "min-width: 220px; max-width: 320px;",
+                                                class: "p-2 whitespace-nowrap",
+                                                style: format!("min-width: 220px; border-left: 1px solid {};", color),
 
                                                 div {
-                                                    class: "absolute top-0 left-0 h-full w-3",
-                                                    style: format!("border-left: 1px solid {};", color)
+                                                    class: "flex gap-2 items-center",
+                                                    if let Some(window) = event.window.clone() {
+                                                        if let Some(icon) = window.icon_base64 {
+                                                            img {
+                                                                class: "w-5 h-5 rounded",
+                                                                src: icon
+                                                            }
+                                                        }
+                                                    }
+                                                    div {
+                                                        class: "font-bold text-base text-primary",
+                                                        "{window_title}"
+                                                    }
                                                 }
 
                                                 div {
-                                                    class: "font-bold text-cyan-400",
+                                                    class: "text-muted-foreground/60 text-xs overflow-hidden text-ellipsis",
                                                     "{process_name}"
                                                 }
 
                                                 div {
-                                                    class: "text-gray-300 overflow-hidden text-ellipsis",
-                                                    "{window_title}"
-                                                }
-
-                                                div {
-                                                    class: "text-gray-300",
-                                                    "{time_range}"
-                                                }
-
-                                                div {
-                                                    class: "text-amber-300",
-                                                    "{duration_formatted}"
+                                                    class: "text-md",
+                                                    "{duration_formatted} ({time_range})"
                                                 }
                                             }
                                         }

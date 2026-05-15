@@ -57,12 +57,38 @@ fn main() {
     // получение событий и сохранение в базу
     thread::spawn(move || {
         let mut database = Database::new(DATABASE_PATH);
-        let mut pending = Vec::with_capacity(DB_BATCH_SIZE);
+
+        let mut pending: Vec<EventModel> = Vec::with_capacity(DB_BATCH_SIZE);
+        let mut current: Option<EventModel> = None;
 
         loop {
             match rx_db.recv_timeout(Duration::from_millis(settings.db_flush_interval_ms)) {
                 Ok(event) => {
-                    pending.push(event);
+                    match current.as_mut() {
+                        Some(active) => {
+                            let same_window =
+                                active.window.as_ref().map(|w| w.hwnd)
+                                    == event.window.as_ref().map(|w| w.hwnd);
+
+                            if same_window {
+                                active.duration += event.duration;
+
+                                if let (Some(active_w), Some(event_w)) =
+                                    (active.window.as_mut(), event.window.as_ref())
+                                {
+                                    active_w.duration += event_w.duration;
+                                    active_w.timestamp = event_w.timestamp;
+                                }
+                            } else {
+                                pending.push(active.clone());
+                                *active = event;
+                            }
+                        }
+
+                        None => {
+                            current = Some(event);
+                        }
+                    }
 
                     if pending.len() >= DB_BATCH_SIZE {
                         if let Err(err) = database.insert_events(&pending) {
@@ -71,7 +97,12 @@ fn main() {
                         pending.clear();
                     }
                 }
+
                 Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                    if let Some(active) = current.take() {
+                        pending.push(active);
+                    }
+
                     if !pending.is_empty() {
                         if let Err(err) = database.insert_events(&pending) {
                             eprintln!("Failed insert event batch: {:?}", err);
@@ -79,12 +110,18 @@ fn main() {
                         pending.clear();
                     }
                 }
+
                 Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                    if let Some(active) = current.take() {
+                        pending.push(active);
+                    }
+
                     if !pending.is_empty() {
                         if let Err(err) = database.insert_events(&pending) {
                             eprintln!("Failed insert event batch: {:?}", err);
                         }
                     }
+
                     break;
                 }
             }

@@ -339,10 +339,6 @@ pub fn StatisticsPage() -> Element {
                                 label: "Пиковый час".to_string(),
                                 value: view.peak_hour.as_ref().map(|hour| format!("{:02}:00 · {}", hour.hour, format_duration_short(hour.total_ms))).unwrap_or_else(|| "Нет данных".to_string()),
                             }
-                            InfoRow {
-                                label: "Самое длинное событие".to_string(),
-                                value: view.longest_event.as_ref().map(|event| format!("{} · {}", event_app(event), format_duration_short(event.duration))).unwrap_or_else(|| "Нет данных".to_string()),
-                            }
                         }
                     }
                 }
@@ -417,20 +413,20 @@ fn GoalsJobsPanel() -> Element {
         section { class: "rounded-md border border-border/40 bg-background/70 p-4",
             div { class: "mb-3 flex flex-wrap items-center justify-between gap-3",
                 div {
-                    h2 { class: "text-base font-semibold text-foreground", "Цели и задачи" }
+                    h2 { class: "text-base font-semibold text-foreground", "Задачи" }
                     p { class: "text-xs text-foreground/55",
-                        "Сводка по записям в базе: цели с тегами и процессом, задачи с тегами и расписанием."
+                        "Сводка по записям в базе: задачи с тегами и расписанием."
                     }
                 }
                 div { class: "flex flex-wrap gap-2",
-                    button {
-                        class: "rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/25",
-                        onclick: move |_| {
-                            goal_edit.set(None);
-                            show_goal_form.set(true);
-                        },
-                        "Новая цель"
-                    }
+                    // button {
+                    //     class: "rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/25",
+                    //     onclick: move |_| {
+                    //         goal_edit.set(None);
+                    //         show_goal_form.set(true);
+                    //     },
+                    //     "Новая цель"
+                    // }
                     button {
                         class: "rounded-md border border-border/40 bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-foreground/5",
                         onclick: move |_| {
@@ -443,14 +439,14 @@ fn GoalsJobsPanel() -> Element {
             }
 
             div { class: "grid gap-3 sm:grid-cols-2 lg:grid-cols-4",
-                div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
-                    div { class: "text-xs text-foreground/55", "Целей всего" }
-                    div { class: "text-lg font-semibold text-foreground", "{goals().len()}" }
-                }
-                div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
-                    div { class: "text-xs text-foreground/55", "Целей выполнено" }
-                    div { class: "text-lg font-semibold text-foreground", "{goals_done}" }
-                }
+                // div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
+                //     div { class: "text-xs text-foreground/55", "Целей всего" }
+                //     div { class: "text-lg font-semibold text-foreground", "{goals().len()}" }
+                // }
+                // div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
+                //     div { class: "text-xs text-foreground/55", "Целей выполнено" }
+                //     div { class: "text-lg font-semibold text-foreground", "{goals_done}" }
+                // }
                 div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
                     div { class: "text-xs text-foreground/55", "Задач всего" }
                     div { class: "text-lg font-semibold text-foreground", "{jobs().len()}" }
@@ -462,50 +458,49 @@ fn GoalsJobsPanel() -> Element {
             }
 
             div { class: "mt-4 grid gap-4 lg:grid-cols-2",
-                div {
-                    h3 { class: "mb-2 text-sm font-medium text-foreground", "Цели" }
-                    div { class: "flex max-h-64 flex-col gap-2 overflow-auto pr-1",
-                        if goals().is_empty() {
-                            div { class: "text-sm text-foreground/55", "Пока нет целей — создайте первую." }
-                        }
-                        for g in goals().iter().cloned() {
-                            div { class: "rounded-md border border-border/30 p-3",
-                                div { class: "flex items-start justify-between gap-2",
-                                    div {
-                                        div { class: "text-sm font-medium text-foreground", "{g.name}" }
-                                        div { class: "text-xs text-foreground/55", "{g.process}" }
-                                        if let Some(desc) = g.description.clone() {
-                                            div { class: "mt-1 text-xs text-foreground/60", "{desc}" }
-                                        }
-                                        div { class: "mt-2 flex flex-wrap gap-1",
-                                            for t in g.tags.iter().cloned() {
-                                                span { class: "rounded-full border border-border/40 px-2 py-0.5 text-[10px] text-foreground/80",
-                                                    "{t.name}"
-                                                }
-                                            }
-                                        }
-                                    }
-                                    button {
-                                        class: "shrink-0 rounded border border-border/40 px-2 py-1 text-xs hover:bg-foreground/5",
-                                        onclick: move |_| {
-                                            goal_edit.set(Some(g.clone()));
-                                            show_goal_form.set(true);
-                                        },
-                                        "Изменить"
-                                    }
-                                }
-                                div { class: "mt-2 text-[10px] text-foreground/45",
-                                    if g.completed { "Статус: выполнено" } else { "Статус: в работе" }
-                                    " · порог "
-                                    "{g.ordering.as_str()}"
-                                }
-                            }
-                        }
-                    }
-                }
+                // div {
+                //     h3 { class: "mb-2 text-sm font-medium text-foreground", "Цели" }
+                //     div { class: "flex max-h-64 flex-col gap-2 overflow-auto pr-1",
+                //         if goals().is_empty() {
+                //             div { class: "text-sm text-foreground/55", "Пока нет целей — создайте первую." }
+                //         }
+                //         for g in goals().iter().cloned() {
+                //             div { class: "rounded-md border border-border/30 p-3",
+                //                 div { class: "flex items-start justify-between gap-2",
+                //                     div {
+                //                         div { class: "text-sm font-medium text-foreground", "{g.name}" }
+                //                         div { class: "text-xs text-foreground/55", "{g.process}" }
+                //                         if let Some(desc) = g.description.clone() {
+                //                             div { class: "mt-1 text-xs text-foreground/60", "{desc}" }
+                //                         }
+                //                         div { class: "mt-2 flex flex-wrap gap-1",
+                //                             for t in g.tags.iter().cloned() {
+                //                                 span { class: "rounded-full border border-border/40 px-2 py-0.5 text-[10px] text-foreground/80",
+                //                                     "{t.name}"
+                //                                 }
+                //                             }
+                //                         }
+                //                     }
+                //                     button {
+                //                         class: "shrink-0 rounded border border-border/40 px-2 py-1 text-xs hover:bg-foreground/5",
+                //                         onclick: move |_| {
+                //                             goal_edit.set(Some(g.clone()));
+                //                             show_goal_form.set(true);
+                //                         },
+                //                         "Изменить"
+                //                     }
+                //                 }
+                //                 div { class: "mt-2 text-[10px] text-foreground/45",
+                //                     if g.completed { "Статус: выполнено" } else { "Статус: в работе" }
+                //                     " · порог "
+                //                     "{g.ordering.as_str()}"
+                //                 }
+                //             }
+                //         }
+                //     }
+                // }
 
                 div {
-                    h3 { class: "mb-2 text-sm font-medium text-foreground", "Задачи" }
                     div { class: "flex max-h-64 flex-col gap-2 overflow-auto pr-1",
                         if jobs().is_empty() {
                             div { class: "text-sm text-foreground/55", "Задач нет — добавьте из календаря или здесь." }
@@ -672,7 +667,7 @@ fn DailyUsageChart(days: Vec<DayUsage>) -> Element {
                 }
             }
 
-            div { class: "relative flex h-full items-end gap-2 pb-8 pt-6 overflow-hidden",
+            div { class: "relative flex h-full items-end gap-2 pb-8 pt-6 overflow-visiblemt-2 grid grid-cols-2 gap-2 text-xs text-foreground/55",
                 for day in visible_days.into_iter().rev() {
                     DailyUsageBar { day, max_ms }
                 }
@@ -700,7 +695,7 @@ fn DailyUsageBar(day: DayUsage, max_ms: u64) -> Element {
         div { class: "group relative flex h-[250px] min-w-8 flex-1 flex-col items-center justify-start gap-2 ",
             
             Tooltip {
-                class: "flex items-end justify-center",
+                class: "flex items-end justify-center max-w-[36px]",
                 align: TooltipAlign::Right,
                 gap: 0,
                 target: rsx! {
@@ -713,7 +708,7 @@ fn DailyUsageBar(day: DayUsage, max_ms: u64) -> Element {
                     }
                 },
                 div {
-                        class: "flex w-full max-w-9 flex-col justify-start items-center overflow-hidden rounded-t-md rounded-b-sm border border-primary/20 bg-foreground/10 shadow-sm transition-transform",
+                        class: "flex w-full max-w-9 flex-col justify-start items-center  rounded-t-md rounded-b-sm border border-primary/20 bg-foreground/10 shadow-sm transition-transform",
                         style: "height: {bar_height}px;",
                         div {
                             class: "w-full bg-primary/25",
@@ -876,8 +871,8 @@ fn DayRow(day: DayUsage) -> Element {
                 }
             }
             div { class: "mt-2 grid grid-cols-2 gap-2 text-xs text-foreground/55",
-                div { "Активно: {format_duration_short(day.active_ms)}" }
-                div { "Idle: {format_duration_short(day.idle_ms)}" }
+                div {  "Активно: {format_duration_short(day.active_ms)}" }
+                div { class:"text-right", "Бездействие: {format_duration_short(day.idle_ms)}" }
             }
         }
     }

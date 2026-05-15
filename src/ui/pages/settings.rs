@@ -6,7 +6,7 @@ use crate::{
     core::{
         EventModel, GoalModel, JobModel, TagModel, app_tag_preset_groups, with_database, with_database_mut
     },
-    ui::{AppProvider, Button, Switch, Theme, ToasterProvider, use_app, use_settings, use_toast},
+    ui::{AppProvider, Button, Language, Select, SelectContent, SelectItem, SelectTrigger, Switch, Theme, ToasterProvider, Windows, use_app, use_settings, use_toast},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,7 +77,6 @@ pub fn SettingsPage() -> Element {
         div { class: "mx-auto flex w-full max-w-5xl flex-col gap-4 p-2",
             div { class: "flex flex-col gap-1",
                 h1 { class: "text-xl font-semibold text-foreground", "Настройки" }
-                p { class: "text-sm text-foreground/60", "Параметры интерфейса, уведомлений, трекера и переноса данных." }
             }
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
@@ -86,21 +85,44 @@ pub fn SettingsPage() -> Element {
                 div { class: "grid gap-4 md:grid-cols-2",
                     label { class: "flex flex-col gap-2 text-sm text-foreground/70",
                         "Тема"
-                        select {
-                            class: "h-10 rounded-md border border-border/40 bg-background px-3 text-foreground outline-none focus:border-primary",
-                            value: "{settings.theme.as_str()}",
-                            onchange: {
-                                let st = settings_rc.clone();
-                                move |evt| {
-                                    let mut c = (*st).clone();
-                                    match evt.value().as_str() {
-                                        "light" => c.set_theme(Theme::Light),
-                                        _ => c.set_theme(Theme::Dark),
+                        {
+                            let st = settings_rc.clone();
+                            rsx! {
+                                Select {
+                                    onchange: move |value: String| {
+                                        let mut c = (*st).clone();
+                                        c.set_theme(Theme::from_str(&value).unwrap_or_default());
+                                    },
+                                    value: "{settings.theme.as_str()}",
+                                    SelectTrigger {}
+                                    SelectContent {
+                                        SelectItem { value: "light", title: "Светлая", "Светлая" }
+                                        SelectItem { value: "dark", title: "Темная", "Темная" }
                                     }
                                 }
-                            },
-                            option { value: "dark", "Темная" }
-                            option { value: "light", "Светлая" }
+                            }
+                        }
+                        
+                    }
+
+                    label { class: "flex flex-col gap-2 text-sm text-foreground/70",
+                        "Язык"
+                        {
+                            let st = settings_rc.clone();
+                            rsx! {
+                                Select {
+                                    onchange: move |value: String| {
+                                        let mut c = (*st).clone();
+                                        c.set_language(Language::from_str(&value).unwrap_or_default());
+                                    },
+                                    value: "{settings.language.as_str()}",
+                                    SelectTrigger {}
+                                    SelectContent {
+                                        SelectItem { value: "english", title: "English", "English" }
+                                        SelectItem { value: "russian", title: "Русский", "Русский" }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -148,44 +170,12 @@ pub fn SettingsPage() -> Element {
                 }
             }
 
-            // section { class: "rounded-md border border-border/40 bg-background/70 p-4",
-            //     h2 { class: "mb-2 text-base font-semibold text-foreground", "Шаблонные теги по приложениям" }
-            //     p { class: "mb-4 text-xs text-foreground/55",
-            //         "Готовые наборы тегов для типичных программ. Добавление в справочник не дублирует уже существующие имена."
-            //     }
-            //     div { class: "flex flex-col gap-3",
-            //         for group in app_tag_preset_groups() {
-            //             div { class: "rounded-md border border-border/30 bg-foreground/5 p-3",
-            //                 div { class: "mb-2 text-sm font-medium text-foreground", "{group.title}" }
-            //                 p { class: "mb-2 text-xs text-foreground/55", "{group.hint}" }
-            //                 div { class: "flex flex-wrap gap-2",
-            //                     for tag in group.tags.iter().cloned() {
-            //                         span { class: "rounded-full border border-border/40 bg-background px-2 py-0.5 text-xs text-foreground/80",
-            //                             "{tag.name}"
-            //                         }
-            //                     }
-            //                 }
-            //                 button {
-            //                     class: "mt-3 rounded-md border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-primary/25",
-            //                     onclick: move |_| {
-            //                         let title = group.title.to_string();
-            //                         let tags: Vec<TagModel> = group.tags.iter().cloned().collect();
-            //                         let inserted = with_database_mut(|db| db.merge_tags(&tags)).unwrap_or(0);
-            //                         info((format!("«{title}»: добавлено тегов: {inserted}."), None));
-            //                     },
-            //                     "Добавить в справочник"
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
-
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div {
                     class: "flex items-center justify-between mb-4",
                     h2 { class: " text-base font-semibold text-foreground", "Уведомления и сбор данных" }
                     Button {
-                        class: "py-0.5!",
+                        class: "py-1!",
                         onclick: move |_| {
                             info(("Тест".to_string(), Some("Тестовое описание".to_string())))
                         },
@@ -204,6 +194,20 @@ pub fn SettingsPage() -> Element {
                                 let mut c = (*st).clone();
                                 let v = !c.settings.read().enable_notifications;
                                 c.set_notifications(v);
+                            }
+                        },
+                    }
+
+                    SettingsSwitch {
+                        title: "База данных".to_string(),
+                        hint: "Сохранять данные о статистике в базу данных.".to_string(),
+                        checked: settings.save_data,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().save_data;
+                                c.set_save_data(v);
                             }
                         },
                     }
@@ -269,6 +273,35 @@ pub fn SettingsPage() -> Element {
                     }
                 }
             }
+
+            section { class: "rounded-md border border-border/40 bg-background/70 p-4",
+                 div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",
+                    div {
+                        class: "flex justify-between items-center gap-3 w-full",
+                        h2 { 
+                            class: "text-base font-semibold text-foreground", "Приложения" 
+                        }
+                        div {
+                            Button {
+                                class: "py-1!",
+                                onclick: move |_| {
+                                    for group in app_tag_preset_groups() {
+                                        let title = group.title.to_string();
+                                        let tags: Vec<TagModel> = group.tags.iter().cloned().collect();
+                                        let inserted = with_database_mut(|db| db.merge_tags(&tags)).unwrap_or(0);
+                                        info((format!("«{title}»: добавлено тегов: {inserted}."), None));
+                                    }
+                                },
+                                "Загрузить шаблоны тегов"
+                            }
+                        }
+                    }
+                }   
+                div { 
+                    class: "flex flex-wrap gap-2 max-h-96 overflow-y-auto" ,
+                    Windows { }
+                }
+             }
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",

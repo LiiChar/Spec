@@ -6,6 +6,9 @@ pub mod tabs;
 pub mod toaster;
 pub mod tooltip;
 pub mod calendar;
+pub mod dropdown;
+pub mod select;
+pub mod alert;
 
 pub use button::*;
 pub use color_picker::*;
@@ -15,3 +18,6 @@ pub use tabs::*;
 pub use toaster::*;
 pub use tooltip::*;
 pub use calendar::*;
+pub use dropdown::*;
+pub use select::*;
+pub use alert::*;

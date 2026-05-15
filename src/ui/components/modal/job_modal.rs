@@ -4,7 +4,7 @@ use dioxus_free_icons::icons::ld_icons::{LdPencil, LdTrash, LdX};
 use dioxus_free_icons::Icon;
 
 use crate::lib::{event_stats, format_duration_short, get_start_day_ts};
-use crate::ui::{Button, use_toast};
+use crate::ui::{Button, use_alert, use_toast};
 use crate::{
     core::{EventModel, JobModel, with_database, with_database_mut},
     lib::{convert_ts_to_date, convert_ts_to_local_date},
@@ -28,12 +28,14 @@ pub fn JobModal(props: JobModalProps) -> Element {
 
     let app = use_app();
     let mut toast = use_toast();
+    let mut alert = use_alert();
 
     let op_job = props.job.clone();
 
     let mut visible_update = use_signal(|| false);
 
     let u_app = app.clone();
+    let r_app = app.clone();
     
     let update = move |job: JobModel| {
         u_app.update_jobs(job);
@@ -41,14 +43,25 @@ pub fn JobModal(props: JobModalProps) -> Element {
 
     let d_app = app.clone();
 
-    let delete = move |id: i64| {
-        d_app.delete_job(id);
-    };
+
+
 
     let job: JobModel = match op_job.clone() {
         Some(j) => j,
         None => return rsx! {""},
     };
+
+    let delete = Callback::new(move |_: ()| {
+        let c_app = d_app.clone();
+        let mut c_toast = toast.clone();
+        alert.error("Вы уверены?".to_string(), None, None, Callback::new(move |ok| 
+            if ok {
+                c_app.delete_job(job.id.unwrap());
+                c_toast.info("Задача успешно удалена".to_string(), None, None);
+                props.on_close.call(());
+            }
+        ));
+    });
 
     let events  = {
         let res_evt: Vec<EventModel> = with_database(|db| {
@@ -57,6 +70,9 @@ pub fn JobModal(props: JobModalProps) -> Element {
         
         res_evt
     };
+
+    let formatted_start_job = convert_ts_to_local_date(job.start_ts as u64).format("%H:%M:%S").to_string();
+    let formatted_end_job = convert_ts_to_local_date(job.end_ts as u64).format("%H:%M:%S").to_string();
 
     let stats = use_signal(|| event_stats(events.clone()));
 
@@ -67,14 +83,14 @@ pub fn JobModal(props: JobModalProps) -> Element {
                 props.on_close.call(());
             },
             div {
-                class: "bg-background p-6 rounded-lg shadow-lg max-w-96 h-full overflow-y-auto relative job-modal-refw",
-                style: format!("outline: 2px solid {}", job.color),
+                class: "bg-background p-6 rounded-lg shadow-lg max-w-96 h-full overflow-y-auto relative job-modal-ref",
+                style: format!("border-bottom: 2px solid {}", job.color),
                 onclick: move |evt| evt.stop_propagation(),
                 button {
                     onclick: move |_| {
                         props.on_close.call(());
                     },
-                    class: "absolute top-0 right-0 hover:bg-destructive rounded-lg p-1 transition-colors",
+                    class: "absolute top-1.5 right-0.5 hover:bg-destructive rounded-lg p-1 transition-colors",
                     Icon {
                         icon: LdX
                     }
@@ -83,13 +99,32 @@ pub fn JobModal(props: JobModalProps) -> Element {
                    if !visible_update(){
                     
                      div {
-                        h2 {
-                            class: "mb-2 text-xl",
-                            "{job.name}"
-                            
-                        }   
+                        div {
+                            class: "flex items-center gap-2 mb-1 justify-between border-b border-border/40 pb-1",
+                            h2 {
+                                class: " text-xl",
+                                "{job.name}"
+                            }
+                            div {
+                                class: "text-xs text-muted-foreground/60 flex gap-2 items-center",
+                                span {
+                                    "{formatted_start_job}"
+                                }
+                                span {
+                                    "-"
+                                }
+                                span {
+                                    "{formatted_end_job}"
+                                }
+                            }   
+                        }
                         if let Some(desc) = &job.description {
+                            p { 
+                                class: "text-xs text-muted-foreground/60 mt-2",
+                                "Описание"
+                             }
                             p {
+                                class: "-mt-1",
                                 "{desc}"
                             }
                         }
@@ -178,27 +213,6 @@ pub fn JobModal(props: JobModalProps) -> Element {
                                                 }
                                             }
 
-                                        if let Some(event) = &s.longest_event {
-                                            div {
-                                                class: "rounded-md border border-border/40 p-3 mb-2",
-
-                                                div {
-                                                    class: "text-xs opacity-70 mb-1",
-                                                    "Самое длинное событие"
-                                                }
-
-                                                div {
-                                                    class: "font-medium",
-                                                    "{format_duration_short(event.duration)}"
-                                                }
-
-                                                div {
-                                                    class: "text-xs opacity-70",
-                                                    "{convert_ts_to_date(event.timestamp)}"
-                                                }
-                                            }
-                                        }
-
                                         if !s.app_list.is_empty() {
                                             div {
                                                 class: "flex flex-col gap-1",
@@ -244,9 +258,7 @@ pub fn JobModal(props: JobModalProps) -> Element {
                             class: "flex gap-1 justify-end mt-2",
                             Button {
                                 onclick: move |_| {
-                                    delete(job.id.unwrap());
-                                    toast.info("Задача успешно удалена".to_string(), None, None);
-                                    props.on_close.call(());
+                                    delete(());
                                 },
                                 Icon {
                                     icon: LdTrash

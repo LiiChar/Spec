@@ -11,7 +11,7 @@ use dioxus_free_icons::Icon;
 use crate::{
     config::DATABASE_PATH,
     core::{Database, EventModel, EventType, JobModel, database::database},
-    lib::{convert_ts_to_local_date, merge_events, merge_visual_density},
+    lib::{CronExpr, convert_ts_to_local_date, merge_events, merge_visual_density},
     ui::{EventElement, JobFormModal, JobModal, use_settings},
 };
 
@@ -248,7 +248,8 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                 .map(|_| 800.0)
                 .unwrap_or(80.0);
 
-            merge_visual_density(merged, px_per_hour, 3.0)
+            // merge_visual_density(merged, px_per_hour, 3.0)
+            merged
         };
 
         let segments = group_by_segments(&merged);
@@ -343,8 +344,15 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                 )
                             };
 
-                            if st_timestamp < segment_ed_timestamp
-                                && ed_timestamp >= segment_st_timestamp
+                            let c = job.cron.clone().unwrap_or("* * * * * * *".to_string());
+                            let cron = CronExpr::parse(c.as_str()).unwrap_or_else(|_| CronExpr::parse("* * * * * * *").unwrap());
+
+                            let dt = Local::now();
+
+                            let is_today = cron.matches(dt, Some(String::from("- - - - + - -")));
+                            
+                            if (st_timestamp <= segment_ed_timestamp
+                                && ed_timestamp >= segment_st_timestamp) && is_today
                             {
                                 event_jobs.push(job.clone());
                             }
@@ -352,6 +360,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
 
                         rsx! {
                             div {
+                                key: "{start_hour}-{end_hour}", 
                                 class: "relative border-dashed border-border/10 border-b-[1px] last:border-b-0",
                                 onclick: move |_| selected_hour.set(Some(start_hour)),
 

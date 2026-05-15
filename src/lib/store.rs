@@ -6,6 +6,7 @@ use crate::ui::Settings;
 pub type Result<T> = std::result::Result<T, String>;
 
 fn config_path() -> Result<PathBuf> {
+    // C:\Users\litav\AppData\Roaming\maxim\tracker\config
     let dirs = ProjectDirs::from("com", "maxim", "tracker")
         .ok_or("no config dir")?;
 

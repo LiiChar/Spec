@@ -5,8 +5,7 @@ use dioxus::prelude::*;
 use crate::{
     lib::format_duration_short,
     ui::{
-        EventsStats, EventsTimelineView,
-        Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant, TimelineOrientation, use_app,
+        AppVariant, EventsStats, EventsTimelineView, Select, SelectContent, SelectItem, SelectTrigger, Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant, TimelineOrientation, use_app
     },
 };
 
@@ -15,6 +14,7 @@ pub fn Events() -> Element {
     let context = use_app();
     let events = context.events;
     let jobs = context.jobs;
+    let mut variant = context.variant;
 
     let value = events.clone();
     let summary = use_memo(move || {
@@ -44,9 +44,24 @@ pub fn Events() -> Element {
                 variant: TabsVariant::Rounded,
                 value: "timeline".to_string(),
                 TabsList {
-                    class: "sticky top-1.5 z-100 rounded-md h-[26px]" ,
+                    class: "sticky top-1.5 z-100 rounded-md h-[26px] overflow-visible" ,
                     TabsTrigger { class: "py-0! h-full", value: "timeline".to_string(), "График" }
                     TabsTrigger { class: "py-0! h-full", value: "statistics".to_string(), "Статистика" }
+                    div {
+                        class: "absolute -right-2 translate-x-full bg-background/50 rounded-md h-[26px] transition-all w-full",
+                        Select {
+                            value: variant.read().as_str(),
+                            onchange: move |value: String| {
+                                variant.set(AppVariant::from_str(&value).unwrap_or_default());
+                            },
+                            SelectTrigger { class: "py-0.5! h-full text-sm" }
+                            SelectContent { 
+                                SelectItem { class: "py-0.5! text-sm", value: "events".to_string(), title: "События", "События" }
+                                SelectItem { class: "py-0.5! text-sm", value: "tags".to_string(), title: "Теги", "Теги" }
+                                SelectItem { class: "py-0.5! text-sm", value: "jobs".to_string(), title: "Задания", "Задания" }
+                            }
+                        }
+                    }
                 }
 
                 TabsContent {
@@ -101,7 +116,7 @@ pub fn Events() -> Element {
 
                                         span { class: "text-xs font-medium text-foreground truncate", "{app}" }
 
-                                        span { class: "text-sm font-bold text-green-400 whitespace-nowrap ml-2",
+                                        span { class: "text-sm font-bold text-primary whitespace-nowrap ml-2",
                                             "{format_duration_short(duration)}"
                                         }
                                     }

@@ -1,11 +1,17 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use dioxus::desktop::tao::window::Icon;
+use std::fs::File;
+use dioxus::prelude::*;
+
+use crate::core::EventModel;
 
 /// Кеш иконок: процесс -> base64 PNG
 static ICON_CACHE: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+const ICONS_DIR: Asset = asset!("/assets/icons");
 
 /// Получить иконку приложения по имени процесса (возвращает base64 PNG)
 pub fn get_app_icon(process_name: &str) -> Option<String> {
@@ -25,6 +31,76 @@ pub fn get_app_icon(process_name: &str) -> Option<String> {
         return Some(icon_data);
     }
 
+    None
+}
+
+pub fn extract_icon_events(events: Vec<EventModel>) -> Vec<EventModel> {
+    events
+        .into_iter()
+        .map(|mut event| {
+            if let Some(mut window) = event.window {
+                window.icon_base64 = extract_icon(window.icon_base64.unwrap_or_default());
+                event.window = Some(window);
+            }
+            event
+        })
+        .collect()
+}
+
+pub fn extract_icon(path: String) -> Option<String> {
+    let trimmed = path.trim();
+
+    if trimmed.is_empty() {
+        return default_icon_data_uri();
+    }
+
+    if trimmed.starts_with("data:image/png;base64,") {
+        return Some(trimmed.to_string());
+    }
+
+    let icon_path = PathBuf::from(trimmed);
+    if icon_path.exists() {
+        if let Ok(mut file) = File::open(&icon_path) {
+            let mut content = String::new();
+            if file.read_to_string(&mut content).is_ok() {
+                return Some(format!("data:image/png;base64,{}", content.trim()));
+            }
+        }
+    }
+
+    let icon_dir = PathBuf::from(ICONS_DIR.bundled().absolute_source_path());
+    let icon_file = icon_dir.join(trimmed);
+    if icon_file.exists() {
+        if let Ok(mut file) = File::open(&icon_file) {
+            let mut content = String::new();
+            if file.read_to_string(&mut content).is_ok() {
+                return Some(format!("data:image/png;base64,{}", content.trim()));
+            }
+        }
+    }
+
+    if looks_like_base64(trimmed) {
+        return Some(format!("data:image/png;base64,{}", trimmed));
+    }
+
+    default_icon_data_uri()
+}
+
+fn looks_like_base64(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.len() > 32 && trimmed.chars().all(|c| {
+        c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || c == '\n' || c == '\r'
+    })
+}
+
+fn default_icon_data_uri() -> Option<String> {
+    let icon_dir = PathBuf::from(ICONS_DIR.bundled().absolute_source_path()).join("default.exe.txt");
+    if let Ok(mut file) = File::open(&icon_dir) {
+        let mut content = String::new();
+        if file.read_to_string(&mut content).is_ok() {
+            return Some(format!("data:image/png;base64,{}", content.trim()));
+        }
+    }
     None
 }
 

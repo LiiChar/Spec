@@ -97,7 +97,7 @@ pub fn Calendar(props: CalendarProps) -> Element {
                     current_day.set(cl_day);
                     props.onselect.call(cl_day)
                 },
-                class: "absolute -left-1 top-0 min-h-[26px] min-w-[26px] h-[26px] w-[26px] -translate-x-full flex items-center justify-center rounded hover:bg-primary/10 transition-colors focus:ring-1 focus:ring-primary",
+                class: "absolute left-0 -bottom-1 min-h-[26px] min-w-[26px] h-[26px] w-[26px] translate-y-full flex items-center justify-center rounded hover:bg-primary/10 transition-colors focus:ring-1 focus:ring-primary",
                 aria_label: "Предыдущий месяц",
                 "←"
             },
@@ -109,7 +109,7 @@ pub fn Calendar(props: CalendarProps) -> Element {
                     current_day.set(cl_day);
                     props.onselect.call(cl_day)
                 },
-                class: "absolute -right-1 top-0 min-h-[26px] min-w-[26px] h-[26px] w-[26px] translate-x-full flex items-center justify-center rounded hover:bg-primary/10 transition-colors focus:ring-1 focus:ring-primary",
+                class: "absolute right-0 -bottom-1 min-h-[26px] min-w-[26px] h-[26px] w-[26px] translate-y-full flex items-center justify-center rounded hover:bg-primary/10 transition-colors focus:ring-1 focus:ring-primary",
                 aria_label: "Следующий месяц",
                 "→"
             }

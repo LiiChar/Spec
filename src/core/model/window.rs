@@ -2,6 +2,23 @@ use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::RECT;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WindowVariant {
+    Desktop(WindowDesktop),
+    Browser(WindowBrowser),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WindowDesktop {
+    
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WindowBrowser {
+    pub url: String,
+    pub browser: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rect {
     pub left: i32,
     pub top: i32,
@@ -24,8 +41,12 @@ impl Rect {
     }
 }
 
+
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WindowModel {
+    #[serde(default)]
+    pub id: Option<i64>,
     pub hwnd: isize,
 
     pub title: String,
@@ -43,6 +64,7 @@ pub struct WindowModel {
     pub is_focused: bool,
 
     pub monitor_id: Option<u32>,
+    pub variant: WindowVariant,
 
     pub timestamp: u64,
     pub duration: u64,

@@ -51,22 +51,48 @@ pub struct ButtonProps {
 pub fn Button(props: ButtonProps) -> Element {
     // variant styles
     let variant_class = match props.variant {
-        ButtonVariant::Default => "bg-background hover:bg-background/80 text-foreground border border-border/40 hover:border-border/60",
-        ButtonVariant::Primary => "bg-primary hover:bg-primary/80 text-foreground border border-primary/40 hover:border-primary/60",
-        ButtonVariant::Secondary => "bg-secondary hover:bg-secondary/80 text-foreground border border-secondary/40 hover:border-secondary/60",
-        ButtonVariant::Success => "bg-success hover:bg-success/80 text-foreground border border-success/40 hover:border-success/60",
-        ButtonVariant::Error => "bg-error hover:bg-error/80 text-foreground border border-error/40 hover:border-error/60",
-        ButtonVariant::Warning => "bg-warning hover:bg-warning/80 text-foreground border border-warning/40 hover:border-warning/60",
-        ButtonVariant::Info => "bg-info hover:bg-info/80 text-foreground border border-info/40 hover:border-info/60",
-        ButtonVariant::Ghost => "bg-transparent hover:bg-foreground/5 text-foreground border border-transparent",
-        ButtonVariant::Icon => "bg-background/40 text-foreground border border-transparent aspect-square",
+        ButtonVariant::Default => {
+            "bg-background/60 text-foreground border border-border/60 hover:bg-background/60 hover:border-border"
+        }
+
+        ButtonVariant::Primary => {
+            "bg-primary/20 text-foreground border border-blue-600 hover:bg-primary/40 hover:border-blue-700"
+        }
+
+        ButtonVariant::Secondary => {
+            "bg-secondary/60 text-foreground border border-zinc-800 hover:bg-zinc-700 hover:border-zinc-700"
+        }
+
+        ButtonVariant::Success => {
+            "bg-emerald-600 text-foreground border border-emerald-600 hover:bg-emerald-700 hover:border-emerald-700"
+        }
+
+        ButtonVariant::Error => {
+            "bg-red-600 text-foreground border border-red-600 hover:bg-red-700 hover:border-red-700"
+        }
+
+        ButtonVariant::Warning => {
+            "bg-amber-500 text-black border border-amber-500 hover:bg-amber-600 hover:border-amber-600"
+        }
+
+        ButtonVariant::Info => {
+            "bg-cyan-600 text-foreground border border-cyan-600 hover:bg-cyan-700 hover:border-cyan-700"
+        }
+
+        ButtonVariant::Ghost => {
+            "bg-transparent text-zinc-700 border border-transparent hover:bg-zinc-100"
+        }
+
+        ButtonVariant::Icon => {
+            "bg-transparent text-zinc-600 border border-transparent hover:bg-zinc-100 hover:text-zinc-900 aspect-square"
+        }
     };
 
     // size styles
     let size_class = match props.size {
         ButtonSize::Sm => "px-2 py-1 text-sm",
-        ButtonSize::Md => "px-3 py-2 text-base",
-        ButtonSize::Lg => "px-4 py-3 text-lg",
+        ButtonSize::Md => "px-2.5 py-1.5 text-base",
+        ButtonSize::Lg => "px-3 py-2 text-lg",
     };
 
     let disabled_class = if props.disabled {

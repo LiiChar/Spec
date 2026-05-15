@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 use crate::{
     core::{JobModel, TagModel},
     lib::convert_ts_to_local_date,
-    ui::{ColorPicker, TimeInput},
+    ui::{Calendar, ColorPicker, TimeInput},
 };
 
 #[derive(Props, PartialEq, Clone)]
@@ -97,6 +97,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
         )
     });
 
+
     let mut end_date = use_signal(|| {
         props.job.as_ref().map_or_else(
             || naive_day_start(day_anchor),
@@ -168,13 +169,41 @@ pub fn JobForm(props: JobFormProps) -> Element {
                 div {
                     class: "flex-1",
                     label { "Начало" }
-                    TimeInput { value: start_time }
+                    div {
+                        class: "flex gap-2 flex-col",
+                        Calendar { 
+                            default_date: start_date.read().clone().date_naive(), 
+                            onselect: move |date: NaiveDate| {
+                                let t = date.and_hms_opt(0, 0, 0).unwrap();
+                                let a = Local.from_local_datetime(&t).unwrap();
+                                start_date.set(a);
+                            }
+                        }
+                        div {
+                            class: "border border-border/40 rounded-md px-2 py-1",
+                            TimeInput { value: start_time }
+                        }
+                    }
                 }
 
                 div {
                     class: "flex-1",
                     label { "Конец" }
-                    TimeInput { value: end_time }
+                    div {
+                        class: "flex gap-2 flex-col",
+                        Calendar { 
+                            default_date: end_date.read().clone().date_naive(), 
+                            onselect: move |date: NaiveDate| {
+                                let t = date.and_hms_opt(0, 0, 0).unwrap();
+                                let a = Local.from_local_datetime(&t).unwrap();
+                                end_date.set(a);
+                            }
+                        }
+                        div {
+                            class: "border border-border/40 rounded-md px-2 py-1",
+                            TimeInput { value: end_time }
+                        }
+                    }
                 }
             }
 
@@ -185,7 +214,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
                     class: "flex-1 px-3 py-2 border rounded-md bg-background",
                     value: "{cron}",
                     oninput: move |e| cron.set(e.value()),
-                    placeholder: "0 9-17 * * 1-5"
+                    placeholder: "0 9-17 * * 1-5 * *"
                 }
 
                 ColorPicker {
@@ -195,7 +224,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
 
                         document::eval(
                             format!(
-                                "document.querySelector('.job-modal-refw').style.outline = '2px solid {}';",
+                                "document.querySelector('.job-modal-ref').style.borderColor = '{}';",
                                 c
                             )
                             .as_str()
@@ -255,10 +284,56 @@ pub fn JobForm(props: JobFormProps) -> Element {
                         Some(description().trim().to_string())
                     };
 
-                    job.cron = if cron().trim().is_empty() {
-                        None
+                    let temp_cron = cron.read().clone();
+
+                    job.cron = if cron.read().clone().trim().is_empty() {
+                        Some("* * * * * * *".to_string())
                     } else {
-                        Some(cron().trim().to_string())
+                        let start_v = start_time();
+                        let start_h = start_v / 3600;
+                        let start_m = (start_v % 3600) / 60;
+                        let start_s = start_v % 60;
+
+
+                        let end_v = end_time();
+                        let end_h = end_v / 3600;
+                        let end_m = (end_v % 3600) / 60;
+                        let end_s = end_v % 60;
+
+                        let cron_sp = temp_cron.trim().split_whitespace().collect::<Vec<_>>();
+                        let mut cron_en = Vec::new();
+
+                        let f_s = format!("{start_s}-{end_s}");
+                        let f_m = format!("{start_m}-{end_m}");
+                        let f_h = format!("{start_h}-{end_h}");
+
+                        cron_en.insert(0, 
+                            if f_s.as_str() == "0-0" {
+                                "*"
+                            } else {
+                                f_s.as_str()
+                            }
+                        );
+                        cron_en.insert(1, 
+                            if f_m.as_str() == "0-0" {
+                                "*"
+                            } else {
+                                f_m.as_str()
+                            }
+                        );
+                        cron_en.insert(2, 
+                            if f_h.as_str() == "0-0" {
+                                "*"
+                            } else {
+                                f_h.as_str()
+                            }
+                        );
+                        cron_en.insert(3, cron_sp.get(3).unwrap_or(&"*"));
+                        cron_en.insert(4, cron_sp.get(4).unwrap_or(&"*"));
+                        cron_en.insert(5, cron_sp.get(5).unwrap_or(&"*"));
+                        cron_en.insert(6, cron_sp.get(6).unwrap_or(&"*"));
+
+                        Some(cron_en.join(" "))
                     };
 
                     job.tags = tags_line()

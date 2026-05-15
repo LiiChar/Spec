@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::ui::{Header, Navigate, Theme, Toaster, use_settings};
+use crate::ui::{Alerter, Header, Navigate, Theme, Toaster, use_settings};
 
 #[component]
 pub fn Layout(children: Element) -> Element {
@@ -22,6 +22,7 @@ pub fn Layout(children: Element) -> Element {
             }
 
             Toaster {}
+            Alerter {}
             Navigate {}
         }
     }

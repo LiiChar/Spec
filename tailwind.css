@@ -2,38 +2,63 @@
 
 @layer theme {
   :root {
-        --background: rgba(255, 255, 255, 1);
-    --foreground: rgba(37, 37, 37, 1);
-    --card: rgba(255, 255, 255, 1);
-    --card-foreground: rgba(37, 37, 37, 1);
-    --popover: rgba(255, 255, 255, 1);
-    --popover-foreground: rgba(37, 37, 37, 1);
-    --primary: rgba(52, 52, 52, 1);
-    --primary-foreground: rgba(251, 251, 251, 1);
-    --secondary: rgba(247, 247, 247, 1);
-    --secondary-foreground: rgba(52, 52, 52, 1);
-    --muted: rgba(247, 247, 247, 1);
-    --muted-foreground: rgba(142, 142, 142, 1);
-    --accent: rgba(247, 247, 247, 1);
-    --accent-foreground: rgba(52, 52, 52, 1);
-    --destructive: rgba(220, 50, 50, 1);
-    --border: rgba(235, 235, 235, 1);
-    --input: rgba(235, 235, 235, 1);
-    --ring: rgba(180, 180, 180, 1);
-    --chart-1: rgba(255, 140, 80, 1);
-    --chart-2: rgba(80, 180, 200, 1);
-    --chart-3: rgba(80, 120, 180, 1);
-    --chart-4: rgba(255, 200, 120, 1);
-    --chart-5: rgba(255, 180, 100, 1);
-    --sidebar: rgba(251, 251, 251, 1);
-    --sidebar-foreground: rgba(37, 37, 37, 1);
-    --sidebar-primary: rgba(52, 52, 52, 1);
-    --sidebar-primary-foreground: rgba(251, 251, 251, 1);
-    --sidebar-accent: rgba(247, 247, 247, 1);
-    --sidebar-accent-foreground: rgba(52, 52, 52, 1);
-    --sidebar-border: rgba(235, 235, 235, 1);
-    --sidebar-ring: rgba(180, 180, 180, 1);
-    --radius: 0.625rem;
+  /* === BASE === */
+  --background: rgba(245, 247, 250, 1);
+  --foreground: rgba(28, 28, 28, 1);
+
+  /* === SURFACES === */
+  --card: rgba(255, 255, 255, 1);
+  --card-foreground: rgba(28, 28, 28, 1);
+
+  --popover: rgba(255, 255, 255, 1);
+  --popover-foreground: rgba(28, 28, 28, 1);
+
+  /* === TEXT === */
+  --muted-foreground: rgba(115, 115, 115, 1);
+
+  /* === LAYERS (ВАЖНО: теперь они реально различимы) === */
+  --secondary: rgba(238, 241, 245, 1);
+  --muted: rgba(232, 236, 241, 1);
+  --accent: rgba(225, 230, 236, 1);
+
+  /* === BORDERS / INPUTS === */
+  --border: rgba(220, 225, 232, 1);
+  --input: rgba(230, 235, 242, 1);
+
+  /* === FOCUS === */
+  --ring: rgba(140, 170, 110, 0.6);
+
+  /* === PRIMARY === */
+  --primary: rgba(140, 170, 110, 1);
+  --primary-foreground: rgba(255, 255, 255, 1);
+
+  /* === STATES === */
+  --secondary-foreground: rgba(40, 40, 40, 1);
+  --accent-foreground: rgba(40, 40, 40, 1);
+  --destructive: rgba(220, 60, 60, 1);
+
+  /* === CHARTS === */
+  --chart-1: rgba(255, 140, 80, 1);
+  --chart-2: rgba(80, 180, 200, 1);
+  --chart-3: rgba(80, 120, 180, 1);
+  --chart-4: rgba(255, 200, 120, 1);
+  --chart-5: rgba(255, 180, 100, 1);
+
+  /* === SIDEBAR === */
+  --sidebar: rgba(248, 250, 252, 1);
+  --sidebar-foreground: rgba(28, 28, 28, 1);
+
+  --sidebar-primary: rgba(140, 170, 110, 1);
+  --sidebar-primary-foreground: rgba(255, 255, 255, 1);
+
+  --sidebar-accent: rgba(235, 238, 242, 1);
+  --sidebar-accent-foreground: rgba(40, 40, 40, 1);
+
+  --sidebar-border: rgba(220, 225, 232, 1);
+  --sidebar-ring: rgba(140, 170, 110, 0.5);
+
+  /* === MISC === */
+  --radius: 0.625rem;
   }
 
   body:has(main.dark) {

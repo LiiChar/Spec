@@ -4,8 +4,9 @@ use rusqlite::{Connection, Result};
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    DB, core::{EventModel, EventType, GoalModel, GoalOrder, JobModel, MIGRATIONS, Rect, TagModel, WindowModel}
+    DB, core::{EventModel, EventType, GoalModel, GoalOrder, JobModel, MIGRATIONS, Rect, TagModel, WindowDesktop, WindowModel, WindowVariant}, lib::{extract_icon, extract_icon_events}
 };
+use crate::core::window::icon_file_name;
 
 pub type Db = Arc<Mutex<Database>>;
 
@@ -50,12 +51,14 @@ impl Database {
         )
         .expect("Failed to configure DB pragmas");
 
-        MIGRATIONS.to_latest(&mut conn)
-            .expect("Failed to run migrations");
 
         let db = Self { conn };
 
         db.init().expect("Failed to init DB");
+
+        // MIGRATIONS.to_latest(&mut db.conn)
+        //     .expect("Failed to run migrations");
+
 
         db
     }
@@ -119,7 +122,9 @@ impl Database {
                 proccess_path TEXT,
                 tags TEXT,
                 cron TEXT,
-                color TEXT NOT NULL
+                color TEXT NOT NULL,
+
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS goals (
@@ -145,9 +150,8 @@ impl Database {
 
             CREATE TABLE IF NOT EXISTS tag_to_window (
                 tag_id INTEGER NOT NULL,
-                process_name INTEGER NOT NULL,
-                FOREIGN KEY(tag_id) REFERENCES tag(id),
-                FOREIGN KEY(process_name) REFERENCES window_activity(process_name)
+                process_name TEXT NOT NULL,
+                FOREIGN KEY(tag_id) REFERENCES tag(id)
             );
 
             CREATE INDEX IF NOT EXISTS idx_window_time
@@ -163,24 +167,6 @@ impl Database {
 
         self.migrate_events_window_activity_nullable()?;
 
-        self.ensure_column(
-            "jobs",
-            "tags",
-            "ALTER TABLE jobs ADD COLUMN tags TEXT",
-        )?;
-
-        self.ensure_column(
-            "goals",
-            "tags",
-            "ALTER TABLE goals ADD COLUMN tags TEXT",
-        )?;
-
-        self.ensure_column(
-            "goals",
-            "name",
-            
-            "ALTER TABLE goals ADD COLUMN name TEXT NOT NULL DEFAULT ''",
-        )?;
 
         Ok(())
     }
@@ -287,6 +273,346 @@ impl Database {
         Ok(inserted)
     }
 
+    pub fn get_window_tag(&self, process_name: String) -> Result<Vec<TagModel>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT
+                t.id, t.name, t.description, t.color
+            FROM tag_to_window w
+                JOIN tag t ON t.id = w.tag_id
+            WHERE w.process_name = ?1
+            "#,
+        )?;
+
+        let tags = stmt.query_map([process_name], |row| {
+            let tag_id: i64 = row.get(0)?;
+            let name: String = row.get(1)?;
+            let description: String = row.get(2)?;
+            let color: String = row.get(3)?;
+
+            Ok(TagModel {
+                id: Some(tag_id),
+                name,
+                description: Some(description),
+                color,
+            })
+        })?;
+
+        Ok(tags.filter_map(Result::ok).collect())
+    }
+
+    pub fn get_windows(&self) -> Result<Vec<(WindowModel, Vec<TagModel>)>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            WITH ranked AS (
+                SELECT
+                    id,
+                    hwnd,
+                    title,
+                    class_name,
+                    icon_base64,
+                    process_name,
+                    process_path,
+                    pid,
+                    left,
+                    top,
+                    right,
+                    bottom,
+                    width,
+                    height,
+                    is_minimized,
+                    is_maximized,
+                    is_visible,
+                    is_focused,
+                    monitor_id,
+                    duration,
+                    timestamp,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY LOWER(TRIM(process_name))
+                        ORDER BY timestamp DESC, id DESC
+                    ) AS rn
+                FROM window_activity
+            )
+            SELECT
+                hwnd,
+                title,
+                class_name,
+                icon_base64,
+                process_name,
+                process_path,
+                pid,
+                left,
+                top,
+                right,
+                bottom,
+                width,
+                height,
+                is_minimized,
+                is_maximized,
+                is_visible,
+                is_focused,
+                monitor_id,
+                duration,
+                timestamp,
+                id
+            FROM ranked
+            WHERE rn = 1
+            ORDER BY timestamp DESC
+            "#,
+        )?;
+
+
+        let windows = stmt.query_map([], |row| {
+            let hwnd: i64 = row.get(0)?;
+            let title: String = row.get(1)?;
+            let class_name: String = row.get(2)?;
+            let icon_base64: Option<String> = row.get(3)?;
+            let process_name: String = row.get(4)?;
+            let process_path: String = row.get(5)?;
+            let pid: i32 = row.get(6)?;
+            let left: i32 = row.get(7)?;
+            let top: i32 = row.get(8)?;
+            let right: i32 = row.get(9)?;
+            let bottom: i32 = row.get(10)?;
+            let width: i32 = row.get(11)?;
+            let height: i32 = row.get(12)?;
+            let is_minimized: i32 = row.get(13)?;
+            let is_maximized: i32 = row.get(14)?;
+            let is_visible: i32 = row.get(15)?;
+            let is_focused: i32 = row.get(16)?;
+            let monitor_id: Option<i32> = row.get(17)?;
+            let duration: i64 = row.get(18)?;
+            let timestamp: i64 = row.get(19)?;
+            let id: i64 = row.get(20)?;
+
+            let rect = Rect {
+                left,
+                top,
+                right,
+                bottom,
+                width,
+                height,
+            };
+
+            let tags = self.get_window_tag(process_name.clone()).unwrap_or_default();
+
+            let icon_base64 = extract_icon(icon_base64.unwrap_or(String::from("")));
+
+            Ok((
+                WindowModel {
+                    id: Some(id),
+                    hwnd: hwnd.try_into().unwrap(),
+                    title,
+                    class_name,
+                    icon_base64,
+                    process_name,
+                    process_path,
+                    pid: pid.try_into().unwrap(),
+                    rect,
+                    variant: WindowVariant::Desktop(WindowDesktop {}),
+
+                    is_minimized: is_minimized != 0,
+                    is_maximized: is_maximized != 0,
+                    is_visible: is_visible != 0,
+                    is_focused: is_focused != 0,
+                    monitor_id: monitor_id.map(|v| v as u32),
+                    timestamp: timestamp as u64,
+                    duration: duration as u64,
+                },
+                tags,
+            ))
+        })?;
+
+
+
+        Ok(windows.collect::<Result<Vec<_>>>()?)
+    }
+
+    pub fn get_windows_by_process(
+        &self,
+        process_name: String,
+    ) -> Result<Vec<(WindowModel, Vec<TagModel>)>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT
+                hwnd,
+                title,
+                class_name,
+                icon_base64,
+                process_name,
+                process_path,
+                pid,
+                left,
+                top,
+                right,
+                bottom,
+                width,
+                height,
+                is_minimized,
+                is_maximized,
+                is_visible,
+                is_focused,
+                monitor_id,
+                duration,
+                timestamp,
+                id
+            FROM window_activity
+            WHERE LOWER(TRIM(process_name)) = LOWER(TRIM(?1))
+            ORDER BY timestamp DESC, rowid DESC
+            "#,
+        )?;
+
+        let windows = stmt.query_map([process_name], |row| {
+            let hwnd: i64 = row.get(0)?;
+            let title: String = row.get(1)?;
+            let class_name: String = row.get(2)?;
+            let icon_base64: Option<String> = row.get(3)?;
+            let process_name: String = row.get(4)?;
+            let process_path: String = row.get(5)?;
+            let pid: i32 = row.get(6)?;
+            let left: i32 = row.get(7)?;
+            let top: i32 = row.get(8)?;
+            let right: i32 = row.get(9)?;
+            let bottom: i32 = row.get(10)?;
+            let width: i32 = row.get(11)?;
+            let height: i32 = row.get(12)?;
+            let is_minimized: i32 = row.get(13)?;
+            let is_maximized: i32 = row.get(14)?;
+            let is_visible: i32 = row.get(15)?;
+            let is_focused: i32 = row.get(16)?;
+            let monitor_id: Option<i32> = row.get(17)?;
+            let duration: i64 = row.get(18)?;
+            let timestamp: i64 = row.get(19)?;
+            println!("Window: {:?}", title);
+            let id: i64 = row.get(20)?;
+
+            let rect = Rect {
+                left,
+                top,
+                right,
+                bottom,
+                width,
+                height,
+            };
+
+            let tags = self.get_window_tag(process_name.clone()).unwrap_or_default();
+
+            Ok((
+                WindowModel {
+                    id: Some(id),
+                    hwnd: hwnd.try_into().unwrap(),
+                    title,
+                    class_name,
+                    icon_base64,
+                    process_name,
+                    process_path,
+                    pid: pid.try_into().unwrap(),
+                    rect,
+                    variant: WindowVariant::Desktop(WindowDesktop {}),
+                    is_minimized: is_minimized != 0,
+                    is_maximized: is_maximized != 0,
+                    is_visible: is_visible != 0,
+                    is_focused: is_focused != 0,
+                    monitor_id: monitor_id.map(|v| v as u32),
+                    timestamp: timestamp as u64,
+                    duration: duration as u64,
+                },
+                tags,
+            ))
+        })?;
+
+        Ok(windows.collect::<Result<Vec<_>>>()?)
+    }
+
+
+    pub fn delete_window(&mut self, process_name: String) -> Result<()> {
+        println!("Delete window: {}", process_name);
+
+        let windows = self.get_windows_by_process(process_name.clone())?;
+        println!("Searches windows count {}", windows.len());
+
+        let tx = self.conn.transaction()?;
+
+        for (window, _) in &windows {
+            if let Some(id) = window.id {
+                println!("Delete events for window id {}", id);
+
+                if let Err(err) = tx.execute(
+                    r#"
+                    DELETE FROM events
+                    WHERE window_activity_id = ?1
+                    "#,
+                    [id],
+                ) {
+                    println!("Delete events failed for id {}: {:?}", id, err);
+                    return Err(err);
+                }
+            } else {
+                println!("Skip window without id");
+            }
+        }
+
+        if let Err(err) = tx.execute(
+            r#"
+            DELETE FROM window_activity
+            WHERE LOWER(TRIM(process_name)) = LOWER(TRIM(?1))
+            "#,
+            [process_name.as_str()],
+        ) {
+            println!("Delete windows failed: {:?}", err);
+            return Err(err);
+        }
+
+        tx.commit()?;
+
+        println!("Delete committed");
+
+        Ok(())
+    }
+
+    pub fn get_tags(&self) -> Result<Vec<TagModel>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT
+                id, name, description, color
+            FROM tag
+            "#,
+        )?;
+
+        let tags = stmt.query_map([], |row| {
+            let id: i64 = row.get(0)?;
+            let name: String = row.get(1)?;
+            let description: Option<String> = row.get(2)?;
+            let color: String = row.get(3)?;
+
+            Ok(TagModel {
+                id: Some(id),
+                name,
+                description,
+                color,
+            })
+        })?;
+
+        Ok(tags.filter_map(Result::ok).collect())
+    }
+
+    pub fn add_tag_to_window(&self, tag_id: i64, process_name: String) -> Result<i64> {
+        self.conn.execute(
+            r#"
+            INSERT INTO tag_to_window (
+                tag_id, process_name
+            )
+            VALUES (?1, ?2)
+            "#,
+            (
+                tag_id,
+                process_name,
+            ),
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
     pub fn get_goals(&self) -> Result<Vec<GoalModel>> {
         let mut stmt = self.conn.prepare(
             r#"
@@ -385,6 +711,8 @@ impl Database {
 
     /// Вставка окна в БД
     pub fn insert_window(&self, w: &WindowModel) -> Result<i64> {
+        let icon_ref = icon_file_name(&w.process_path);
+
         self.conn.execute(
             r#"
             INSERT INTO window_activity (
@@ -422,7 +750,7 @@ impl Database {
                 ":monitor_id": w.monitor_id.map(|v| v as i32),
                 ":timestamp": w.timestamp as i64,
                 ":duration": w.duration as i64,
-                ":icon_base64": w.icon_base64.as_deref(),
+                ":icon_base64": icon_ref,
             },
         )?;
 
@@ -718,6 +1046,8 @@ impl Database {
         for event in events {
             let window_id: Option<i64> = match &event.window {
                 Some(w) => {
+                    let icon_ref = icon_file_name(&w.process_path);
+
                     tx.execute(
                         r#"
                         INSERT INTO window_activity (
@@ -755,7 +1085,7 @@ impl Database {
                             ":monitor_id": w.monitor_id.map(|v| v as i32),
                             ":timestamp": w.timestamp as i64,
                             ":duration": w.duration as i64,
-                            ":icon_base64": w.icon_base64.as_deref(),
+                            ":icon_base64": icon_ref,
                         },
                     )?;
 
@@ -792,6 +1122,7 @@ impl Database {
 
         let window = if hwnd.is_some() {
             Some(WindowModel {
+                id: None,
                 hwnd: row.get(0)?,
                 title: row.get(1)?,
                 class_name: row.get(2)?,
@@ -806,6 +1137,7 @@ impl Database {
                     width: row.get(10)?,
                     height: row.get(11)?,
                 },
+                variant: WindowVariant::Desktop(WindowDesktop {}),
                 is_minimized: row.get(12)?,
                 is_maximized: row.get(13)?,
                 is_visible: row.get(14)?,
@@ -864,7 +1196,7 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration
+                e.event_type, e.timestamp, e.duration, w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             ORDER BY e.timestamp ASC
@@ -873,7 +1205,11 @@ impl Database {
 
         let events = stmt.query_map([], |row| Self::row_to_event(row))?;
 
-        Ok(events.filter_map(Result::ok).collect())
+        let events = events.filter_map(Result::ok).collect();
+
+        let events = extract_icon_events(events);
+
+        Ok(events)
     }
 
     /// Получить события за временной интервал
@@ -889,14 +1225,19 @@ impl Database {
                 e.event_type, e.timestamp, e.duration, w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
-            WHERE e.timestamp BETWEEN ?1 AND ?2
+            WHERE e.timestamp <= ?2
+            AND (e.timestamp + e.duration) >= ?1
             ORDER BY e.timestamp ASC
             "#,
         )?;
 
         let events = stmt.query_map([from_ts, to_ts], |row| Self::row_to_event(row))?;
 
-        Ok(events.filter_map(Result::ok).collect())
+        let events = events.filter_map(Result::ok).collect();
+
+        let events = extract_icon_events(events);
+
+        Ok(events)
     }
 
     /// Получить события по типу
@@ -920,7 +1261,11 @@ impl Database {
 
         let events = stmt.query_map([type_i32], |row| Self::row_to_event(row))?;
 
-        Ok(events.filter_map(Result::ok).collect())
+        let events = events.filter_map(Result::ok).collect();
+
+        let events = extract_icon_events(events);
+
+        Ok(events)
     }
 
     /// Получить события по процессу
@@ -933,7 +1278,7 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration, w.icon_base64
+                e.event_type, e.timestamp, e.duration, w.icon_base64, w.id
             FROM events e
             JOIN window_activity w ON e.window_activity_id = w.id
             WHERE w.process_name = ?1
@@ -963,12 +1308,15 @@ impl Database {
                         width: row.get(10)?,
                         height: row.get(11)?,
                     },
+                    variant: WindowVariant::Desktop(WindowDesktop {}),
+
                     is_minimized: row.get(12)?,
                     is_maximized: row.get(13)?,
                     is_visible: row.get(14)?,
                     is_focused: row.get(15)?,
                     monitor_id: row.get(16)?,
                     icon_base64: row.get(22)?,
+                    id: Some(row.get(23)?),
                     timestamp: w_ts as u64,
                     duration: w_dur as u64,
                 }),
@@ -978,7 +1326,11 @@ impl Database {
             })
         })?;
 
-        Ok(events.filter_map(Result::ok).collect())
+        let events = events.filter_map(Result::ok).collect();
+
+        let events = extract_icon_events(events);
+
+        Ok(events)
     }
 
     /// Получить общее время активности по процессам
@@ -1026,7 +1378,7 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration, w.icon_base64
+                e.event_type, e.timestamp, e.duration, w.icon_base64, w.id
             FROM events e
             JOIN window_activity w ON e.window_activity_id = w.id
             ORDER BY e.timestamp DESC
@@ -1056,6 +1408,7 @@ impl Database {
                         width: row.get(10)?,
                         height: row.get(11)?,
                     },
+                    variant: WindowVariant::Desktop(WindowDesktop {}),
                     is_minimized: row.get(12)?,
                     is_maximized: row.get(13)?,
                     is_visible: row.get(14)?,
@@ -1064,6 +1417,7 @@ impl Database {
                     timestamp: w_ts as u64,
                     duration: w_dur as u64,
                     icon_base64: row.get(22)?,
+                    id: Some(row.get(23)?),
                 }),
                 event_type: Self::event_type_from_i32(row.get(19)?),
                 timestamp: e_ts as u64,
@@ -1071,7 +1425,11 @@ impl Database {
             })
         })?;
 
-        Ok(events.filter_map(Result::ok).collect())
+        let events = events.filter_map(Result::ok).collect();
+
+        let events = extract_icon_events(events);
+
+        Ok(events)
     }
 
     pub fn get_events_since(&self, from_ts: i64, limit: i64) -> Result<Vec<EventModel>> {
@@ -1102,6 +1460,8 @@ impl Database {
                 Err(err) => println!("DB row error: {:?}", err),
             }
         }
+
+        let mut events = extract_icon_events(events);
 
         events.reverse();
         Ok(events)

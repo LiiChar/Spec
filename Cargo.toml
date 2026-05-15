@@ -37,6 +37,7 @@ auto-launch = "0.6.0"
 directories = "6.0.0"
 rusqlite_migration = "2.5.0"
 web-sys = "0.3.98"
+browser-url = "0.1.1"
 
 
 

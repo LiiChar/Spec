@@ -224,7 +224,7 @@ pub fn Tooltip(props: TooltipProps) -> Element {
             if visible() || props.visible {
                 div {
                     role: "tooltip",
-                    class: "absolute pointer-events-none whitespace-nowrap rounded-md border backdrop-blur-md border-border/40 bg-secondary/50 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class}",
+                    class: "absolute pointer-events-none whitespace-nowrap rounded-md border border-border/40 bg-secondary/70 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class}",
 
                     style: match props.at_cursor {
                         true => format!(

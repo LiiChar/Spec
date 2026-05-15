@@ -100,12 +100,20 @@ fn merge_bridge_noise(events: Vec<EventModel>) -> Vec<EventModel> {
         }
 
         if let Some(end_idx) = found {
-            for k in i + 1..=end_idx {
-                merge_into(&mut base, &events[k]);
-            }
+            let total_gap = events[i + 1].timestamp.saturating_sub(end_ts(&base))
+                + events[end_idx].timestamp.saturating_sub(end_ts(&events[end_idx - 1]));
 
-            result.push(base);
-            i = end_idx + 1;
+            if total_gap <= MAX_BRIDGE_TOTAL_MS {
+                for k in i + 1..=end_idx {
+                    merge_into(&mut base, &events[k]);
+                }
+
+                result.push(base);
+                i = end_idx + 1;
+            } else {
+                result.push(events[i].clone());
+                i += 1;
+            }
         } else {
             result.push(events[i].clone());
             i += 1;
