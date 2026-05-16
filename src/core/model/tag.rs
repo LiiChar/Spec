@@ -23,3 +23,56 @@ impl TagModel {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TagRuleField {
+    Process,
+    Title,
+    BrowserUrl,
+    Any,
+}
+
+impl Default for TagRuleField {
+    fn default() -> Self {
+        TagRuleField::Process
+    }
+}
+
+impl TagRuleField {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TagRuleField::Process => "process",
+            TagRuleField::Title => "title",
+            TagRuleField::BrowserUrl => "browser",
+            TagRuleField::Any => "any",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        match value.to_lowercase().as_str() {
+            "process" => TagRuleField::Process,
+            "title" => TagRuleField::Title,
+            "browser" => TagRuleField::BrowserUrl,
+            _ => TagRuleField::Any,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq)]
+pub struct TagRule {
+    pub field: TagRuleField,
+    pub pattern: String,
+    pub tag: String,
+    pub enabled: bool,
+}
+
+impl Default for TagRule {
+    fn default() -> Self {
+        Self {
+            field: TagRuleField::Process,
+            pattern: String::new(),
+            tag: String::new(),
+            enabled: true,
+        }
+    }
+}

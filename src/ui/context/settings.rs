@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::core::{TagRule, TagRuleField};
 use crate::lib::{load_settings, save_settings};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -50,7 +51,7 @@ impl Language {
 }
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Settings {
     pub theme: Theme,
     pub language: Language,
@@ -65,7 +66,11 @@ pub struct Settings {
     pub event_duration: u32,
     pub report_interval: u64,
     pub show_apps: bool,
-    pub save_data: bool
+    pub save_data: bool,
+    pub work_start_hour: u32,
+    pub work_end_hour: u32,
+    pub show_browser_details: bool,
+    pub tag_rules: Vec<TagRule>,
 }
 
 impl Default for Settings {
@@ -84,7 +89,16 @@ impl Default for Settings {
             idle_threshold: 250,
             report_interval: 5000,
             show_apps: true,
-            save_data: true
+            save_data: true,
+            work_start_hour: 9,
+            work_end_hour: 18,
+            show_browser_details: true,
+            tag_rules: vec![TagRule {
+                field: TagRuleField::Process,
+                pattern: r"chrome|edge|firefox|brave|opera".to_string(),
+                tag: "Browser".to_string(),
+                enabled: true,
+            }],
         }
     }
 }
@@ -164,6 +178,21 @@ impl SettingsState {
 
     pub fn set_show_apps(&mut self, v: bool) {
         self.mutate(|s| s.show_apps = v);
+    }
+
+    pub fn set_work_hours(&mut self, start_hour: u32, end_hour: u32) {
+        self.mutate(|s| {
+            s.work_start_hour = start_hour.min(23);
+            s.work_end_hour = end_hour.min(23);
+        });
+    }
+
+    pub fn set_show_browser_details(&mut self, v: bool) {
+        self.mutate(|s| s.show_browser_details = v);
+    }
+
+    pub fn set_tag_rules(&mut self, rules: Vec<TagRule>) {
+        self.mutate(|s| s.tag_rules = rules);
     }
 }
 

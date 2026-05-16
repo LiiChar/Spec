@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -8,7 +9,7 @@ use windows::Win32::System::SystemInformation::GetTickCount;
 use windows::Win32::UI::Input::KeyboardAndMouse::GetLastInputInfo;
 use windows::Win32::UI::Input::KeyboardAndMouse::LASTINPUTINFO;
 
-use crate::core::{get_current_window, EventModel, EventType, WindowModel};
+use crate::core::{get_current_window, EventModel, EventType, TagRule, TagRuleField, WindowModel, with_database_mut};
 use crate::lib::{current_ts, load_settings};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,11 +36,15 @@ pub struct Tracker {
     pub idle_threshold: u32,
     pub event_duration: u32,
     pub report_interval: Duration,
+    pub settings_reload_at: Instant,
+    pub rules: Vec<(TagRule, Regex)>,
+    pub settings: crate::ui::Settings,
 }
 
 impl Tracker {
     pub fn new() -> Self {
         let settings = load_settings();
+        let rules = compile_rules(&settings.tag_rules);
         Self {
             current: None,
             start_time: Instant::now(),
@@ -47,11 +52,15 @@ impl Tracker {
             stats: HashMap::new(),
             idle_threshold: settings.idle_threshold,
             event_duration: settings.event_duration,
-
+            settings_reload_at: Instant::now() + Duration::from_secs(5),
+            rules,
+            settings,
         }
     }
 
     pub fn tick(&mut self, tx: &Sender<EventModel>) {
+        self.maybe_reload_settings();
+
         let now = Instant::now();
 
         if let Some(current) = &self.current {
@@ -76,7 +85,10 @@ impl Tracker {
         });
     }
 
-    fn switch(&mut self, next: Activity, tx: &Sender<EventModel>) {
+    fn switch(&mut self, mut next: Activity, tx: &Sender<EventModel>) {
+        self.maybe_reload_settings();
+        self.apply_rules(&mut next);
+
         let now = Instant::now();
 
         if let Some(current) = &self.current {
@@ -185,9 +197,75 @@ fn same_activity(a: &Activity, b: &Activity) -> bool {
     }
 
     match (&a.window, &b.window) {
-        (Some(w1), Some(w2)) => w1.title == w2.title && w1.process_name == w2.process_name,
+        (Some(w1), Some(w2)) => {
+            w1.title == w2.title
+                && w1.process_name == w2.process_name
+                && w1.variant == w2.variant
+        }
         (None, None) => true,
         _ => false,
+    }
+}
+
+fn compile_rules(rules: &[TagRule]) -> Vec<(TagRule, Regex)> {
+    rules
+        .iter()
+        .filter_map(|rule| {
+            if !rule.enabled || rule.pattern.trim().is_empty() {
+                return None;
+            }
+
+            Regex::new(&rule.pattern)
+                .ok()
+                .map(|regex| (rule.clone(), regex))
+        })
+        .collect()
+}
+
+impl Tracker {
+    fn maybe_reload_settings(&mut self) {
+        let now = Instant::now();
+        if now >= self.settings_reload_at {
+            let settings = load_settings();
+            if settings != self.settings {
+                self.report_interval = Duration::from_millis(settings.report_interval);
+                self.idle_threshold = settings.idle_threshold;
+                self.event_duration = settings.event_duration;
+                self.rules = compile_rules(&settings.tag_rules);
+                self.settings = settings;
+            }
+            self.settings_reload_at = now + Duration::from_secs(5);
+        }
+    }
+
+    fn apply_rules(&self, activity: &mut Activity) {
+        if let Some(window) = activity.window.as_ref() {
+            for (rule, regex) in &self.rules {
+                let haystack = match rule.field {
+                    TagRuleField::Process => window.process_name.as_str(),
+                    TagRuleField::Title => window.title.as_str(),
+                    TagRuleField::BrowserUrl => match &window.variant {
+                        crate::core::WindowVariant::Browser(browser) => browser.url.as_str(),
+                        _ => "",
+                    },
+                    TagRuleField::Any => &format!(
+                            "{} {} {}",
+                            window.process_name,
+                            window.title,
+                            match &window.variant {
+                                crate::core::WindowVariant::Browser(browser) => browser.url.clone(),
+                                _ => "".to_string(),
+                            }
+                        )
+                };
+
+                if regex.is_match(&haystack) {
+                    let process_name = window.process_name.clone();
+                    let tag_name = rule.tag.clone();
+                    let _ = with_database_mut(|db| db.add_tag_to_window_if_missing(&tag_name, process_name.clone()));
+                }
+            }
+        }
     }
 }
 

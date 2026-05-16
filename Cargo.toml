@@ -31,6 +31,7 @@ windows = { version = "0.62.2", features = [
 ]}
 image = "0.25"
 base64 = "0.22"
+regex = "1.11"
 dioxus-signals = "0.7.4"
 dioxus-free-icons = { version = "0.10.0", features = ["lucide"] }
 auto-launch = "0.6.0"

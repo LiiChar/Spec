@@ -4,7 +4,7 @@ use rusqlite::{Connection, Result};
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    DB, core::{EventModel, EventType, GoalModel, GoalOrder, JobModel, MIGRATIONS, Rect, TagModel, WindowDesktop, WindowModel, WindowVariant}, lib::{extract_icon, extract_icon_events}
+    DB, core::{EventModel, EventType, GoalModel, GoalOrder, JobModel, MIGRATIONS, Rect, TagModel, WindowDesktop, WindowBrowser, WindowModel, WindowVariant}, lib::{extract_icon, extract_icon_events}
 };
 use crate::core::window::icon_file_name;
 
@@ -77,6 +77,9 @@ impl Database {
                 process_name TEXT,
                 process_path TEXT,
                 pid INTEGER,
+                browser_name TEXT,
+                browser_url TEXT,
+                tags TEXT,
 
                 left INTEGER,
                 top INTEGER,
@@ -164,8 +167,27 @@ impl Database {
         )?;
 
         self.migrate_events_window_activity_nullable()?;
+        self.ensure_window_activity_columns()?;
 
+        Ok(())
+    }
 
+    fn ensure_window_activity_columns(&self) -> Result<()> {
+        self.ensure_column(
+            "window_activity",
+            "browser_name",
+            "ALTER TABLE window_activity ADD COLUMN browser_name TEXT",
+        )?;
+        self.ensure_column(
+            "window_activity",
+            "browser_url",
+            "ALTER TABLE window_activity ADD COLUMN browser_url TEXT",
+        )?;
+        self.ensure_column(
+            "window_activity",
+            "tags",
+            "ALTER TABLE window_activity ADD COLUMN tags TEXT",
+        )?;
         Ok(())
     }
 
@@ -339,6 +361,8 @@ impl Database {
                 process_name,
                 process_path,
                 pid,
+                browser_name,
+                browser_url,
                 left,
                 top,
                 right,
@@ -368,20 +392,22 @@ impl Database {
             let process_name: String = row.get(4)?;
             let process_path: String = row.get(5)?;
             let pid: i32 = row.get(6)?;
-            let left: i32 = row.get(7)?;
-            let top: i32 = row.get(8)?;
-            let right: i32 = row.get(9)?;
-            let bottom: i32 = row.get(10)?;
-            let width: i32 = row.get(11)?;
-            let height: i32 = row.get(12)?;
-            let is_minimized: i32 = row.get(13)?;
-            let is_maximized: i32 = row.get(14)?;
-            let is_visible: i32 = row.get(15)?;
-            let is_focused: i32 = row.get(16)?;
-            let monitor_id: Option<i32> = row.get(17)?;
-            let duration: i64 = row.get(18)?;
-            let timestamp: i64 = row.get(19)?;
-            let id: i64 = row.get(20)?;
+            let browser_name: Option<String> = row.get(7)?;
+            let browser_url: Option<String> = row.get(8)?;
+            let left: i32 = row.get(9)?;
+            let top: i32 = row.get(10)?;
+            let right: i32 = row.get(11)?;
+            let bottom: i32 = row.get(12)?;
+            let width: i32 = row.get(13)?;
+            let height: i32 = row.get(14)?;
+            let is_minimized: i32 = row.get(15)?;
+            let is_maximized: i32 = row.get(16)?;
+            let is_visible: i32 = row.get(17)?;
+            let is_focused: i32 = row.get(18)?;
+            let monitor_id: Option<i32> = row.get(19)?;
+            let duration: i64 = row.get(20)?;
+            let timestamp: i64 = row.get(21)?;
+            let id: i64 = row.get(22)?;
 
             let rect = Rect {
                 left,
@@ -407,7 +433,16 @@ impl Database {
                     process_path,
                     pid: pid.try_into().unwrap(),
                     rect,
-                    variant: WindowVariant::Desktop(WindowDesktop {}),
+                    variant: if let (Some(browser_name), Some(browser_url)) =
+                        (browser_name.clone(), browser_url.clone())
+                    {
+                        WindowVariant::Browser(WindowBrowser {
+                            browser: browser_name,
+                            url: browser_url,
+                        })
+                    } else {
+                        WindowVariant::Desktop(WindowDesktop {})
+                    },
 
                     is_minimized: is_minimized != 0,
                     is_maximized: is_maximized != 0,
@@ -440,6 +475,8 @@ impl Database {
                 process_name,
                 process_path,
                 pid,
+                browser_name,
+                browser_url,
                 left,
                 top,
                 right,
@@ -468,21 +505,23 @@ impl Database {
             let process_name: String = row.get(4)?;
             let process_path: String = row.get(5)?;
             let pid: i32 = row.get(6)?;
-            let left: i32 = row.get(7)?;
-            let top: i32 = row.get(8)?;
-            let right: i32 = row.get(9)?;
-            let bottom: i32 = row.get(10)?;
-            let width: i32 = row.get(11)?;
-            let height: i32 = row.get(12)?;
-            let is_minimized: i32 = row.get(13)?;
-            let is_maximized: i32 = row.get(14)?;
-            let is_visible: i32 = row.get(15)?;
-            let is_focused: i32 = row.get(16)?;
-            let monitor_id: Option<i32> = row.get(17)?;
-            let duration: i64 = row.get(18)?;
-            let timestamp: i64 = row.get(19)?;
+            let browser_name: Option<String> = row.get(7)?;
+            let browser_url: Option<String> = row.get(8)?;
+            let left: i32 = row.get(9)?;
+            let top: i32 = row.get(10)?;
+            let right: i32 = row.get(11)?;
+            let bottom: i32 = row.get(12)?;
+            let width: i32 = row.get(13)?;
+            let height: i32 = row.get(14)?;
+            let is_minimized: i32 = row.get(15)?;
+            let is_maximized: i32 = row.get(16)?;
+            let is_visible: i32 = row.get(17)?;
+            let is_focused: i32 = row.get(18)?;
+            let monitor_id: Option<i32> = row.get(19)?;
+            let duration: i64 = row.get(20)?;
+            let timestamp: i64 = row.get(21)?;
             println!("Window: {:?}", title);
-            let id: i64 = row.get(20)?;
+            let id: i64 = row.get(22)?;
 
             let rect = Rect {
                 left,
@@ -506,7 +545,16 @@ impl Database {
                     process_path,
                     pid: pid.try_into().unwrap(),
                     rect,
-                    variant: WindowVariant::Desktop(WindowDesktop {}),
+                    variant: if let (Some(browser_name), Some(browser_url)) =
+                        (browser_name.clone(), browser_url.clone())
+                    {
+                        WindowVariant::Browser(WindowBrowser {
+                            browser: browser_name,
+                            url: browser_url,
+                        })
+                    } else {
+                        WindowVariant::Desktop(WindowDesktop {})
+                    },
                     is_minimized: is_minimized != 0,
                     is_maximized: is_maximized != 0,
                     is_visible: is_visible != 0,
@@ -609,6 +657,78 @@ impl Database {
         )?;
 
         Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_tag_by_name(&self, name: &str) -> Result<Option<TagModel>> {
+        let mut stmt = self.conn.prepare(
+            r#"
+            SELECT id, name, description, color
+            FROM tag
+            WHERE name = ?1
+            "#,
+        )?;
+
+        let tag = stmt.query_row([name], |row| {
+            Ok(TagModel {
+                id: Some(row.get(0)?),
+                name: row.get(1)?,
+                description: row.get(2)?,
+                color: row.get(3)?,
+            })
+        });
+
+        match tag {
+            Ok(tag) => Ok(Some(tag)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn has_tag_for_window(&self, process_name: &str, tag_id: i64) -> Result<bool> {
+        let exists: i32 = self.conn.query_row(
+            r#"
+            SELECT COUNT(1)
+            FROM tag_to_window
+            WHERE LOWER(TRIM(process_name)) = LOWER(TRIM(?1))
+            AND tag_id = ?2
+            "#,
+            (process_name, tag_id),
+            |row| row.get(0),
+        )?;
+
+        Ok(exists > 0)
+    }
+
+    pub fn ensure_tag(&self, name: &str, color: &str) -> Result<TagModel> {
+        if let Some(tag) = self.get_tag_by_name(name)? {
+            return Ok(tag);
+        }
+
+        self.conn.execute(
+            r#"
+            INSERT INTO tag (name, description, color)
+            VALUES (?1, NULL, ?2)
+            "#,
+            (name, color),
+        )?;
+
+        Ok(TagModel {
+            id: Some(self.conn.last_insert_rowid()),
+            name: name.to_string(),
+            description: None,
+            color: color.to_string(),
+        })
+    }
+
+    pub fn add_tag_to_window_if_missing(&self, tag_name: &str, process_name: String) -> Result<()> {
+        let tag = self.ensure_tag(tag_name, "#94a3b8")?;
+        let tag_id = tag.id.ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+
+        if !self.has_tag_for_window(&process_name, tag_id)? {
+            self.add_tag_to_window(tag_id, process_name)?;
+        }
+
+        Ok(())
     }
 
     pub fn get_goals(&self) -> Result<Vec<GoalModel>> {
@@ -716,6 +836,7 @@ impl Database {
             INSERT INTO window_activity (
                 hwnd, title, class_name,
                 process_name, process_path, pid,
+                browser_name, browser_url,
                 left, top, right, bottom, width, height,
                 is_minimized, is_maximized, is_visible, is_focused,
                 monitor_id, timestamp, duration, icon_base64
@@ -723,6 +844,7 @@ impl Database {
             VALUES (
                 :hwnd, :title, :class_name,
                 :process_name, :process_path, :pid,
+                :browser_name, :browser_url,
                 :left, :top, :right, :bottom, :width, :height,
                 :is_minimized, :is_maximized, :is_visible, :is_focused,
                 :monitor_id, :timestamp, :duration, :icon_base64
@@ -735,6 +857,14 @@ impl Database {
                 ":process_name": &w.process_name,
                 ":process_path": &w.process_path,
                 ":pid": w.pid,
+                ":browser_name": match &w.variant {
+                    WindowVariant::Browser(browser) => Some(browser.browser.clone()),
+                    _ => None,
+                },
+                ":browser_url": match &w.variant {
+                    WindowVariant::Browser(browser) => Some(browser.url.clone()),
+                    _ => None,
+                },
                 ":left": w.rect.left,
                 ":top": w.rect.top,
                 ":right": w.rect.right,
@@ -1051,6 +1181,7 @@ impl Database {
                         INSERT INTO window_activity (
                             hwnd, title, class_name,
                             process_name, process_path, pid,
+                            browser_name, browser_url,
                             left, top, right, bottom, width, height,
                             is_minimized, is_maximized, is_visible, is_focused,
                             monitor_id, timestamp, duration, icon_base64
@@ -1058,6 +1189,7 @@ impl Database {
                         VALUES (
                             :hwnd, :title, :class_name,
                             :process_name, :process_path, :pid,
+                            :browser_name, :browser_url,
                             :left, :top, :right, :bottom, :width, :height,
                             :is_minimized, :is_maximized, :is_visible, :is_focused,
                             :monitor_id, :timestamp, :duration, :icon_base64
@@ -1084,6 +1216,14 @@ impl Database {
                             ":timestamp": w.timestamp as i64,
                             ":duration": w.duration as i64,
                             ":icon_base64": icon_ref,
+                            ":browser_name": match &w.variant {
+                                WindowVariant::Browser(browser) => Some(browser.browser.clone()),
+                                _ => None,
+                            },
+                            ":browser_url": match &w.variant {
+                                WindowVariant::Browser(browser) => Some(browser.url.clone()),
+                                _ => None,
+                            },
                         },
                     )?;
 
@@ -1116,34 +1256,47 @@ impl Database {
     
 
     fn row_to_event(row: &rusqlite::Row) -> Result<EventModel> {
-        let hwnd: Option<i64> = row.get(0).ok();
+        let hwnd: Option<i64> = row.get("hwnd").ok();
 
         let window = if hwnd.is_some() {
+            let browser_name: Option<String> = row.get("browser_name")?;
+            let browser_url: Option<String> = row.get("browser_url")?;
+            let variant = if let (Some(browser_name), Some(browser_url)) =
+                (browser_name.clone(), browser_url.clone())
+            {
+                WindowVariant::Browser(WindowBrowser {
+                    browser: browser_name,
+                    url: browser_url,
+                })
+            } else {
+                WindowVariant::Desktop(WindowDesktop {})
+            };
+
             Some(WindowModel {
                 id: None,
-                hwnd: row.get(0)?,
-                title: row.get(1)?,
-                class_name: row.get(2)?,
-                process_name: row.get(3)?,
-                process_path: row.get(4)?,
-                pid: row.get(5)?,
+                hwnd: row.get("hwnd")?,
+                title: row.get("title")?,
+                class_name: row.get("class_name")?,
+                process_name: row.get("process_name")?,
+                process_path: row.get("process_path")?,
+                pid: row.get("pid")?,
                 rect: Rect {
-                    left: row.get(6)?,
-                    top: row.get(7)?,
-                    right: row.get(8)?,
-                    bottom: row.get(9)?,
-                    width: row.get(10)?,
-                    height: row.get(11)?,
+                    left: row.get("left")?,
+                    top: row.get("top")?,
+                    right: row.get("right")?,
+                    bottom: row.get("bottom")?,
+                    width: row.get("width")?,
+                    height: row.get("height")?,
                 },
-                variant: WindowVariant::Desktop(WindowDesktop {}),
-                is_minimized: row.get(12)?,
-                is_maximized: row.get(13)?,
-                is_visible: row.get(14)?,
-                is_focused: row.get(15)?,
-                monitor_id: row.get(16)?,
-                timestamp: row.get::<_, i64>(17)? as u64,
-                duration: row.get::<_, i64>(18)? as u64,
-                icon_base64: row.get(22).ok(),
+                variant,
+                is_minimized: row.get("is_minimized")?,
+                is_maximized: row.get("is_maximized")?,
+                is_visible: row.get("is_visible")?,
+                is_focused: row.get("is_focused")?,
+                monitor_id: row.get("monitor_id")?,
+                timestamp: row.get::<_, i64>("timestamp")? as u64,
+                duration: row.get::<_, i64>("duration")? as u64,
+                icon_base64: row.get("icon_base64").ok(),
             })
         } else {
             None
@@ -1151,9 +1304,9 @@ impl Database {
 
         Ok(EventModel {
             window,
-            event_type: Self::event_type_from_i32(row.get(19)?),
-            timestamp: row.get::<_, i64>(20)? as u64,
-            duration: row.get::<_, i64>(21)? as u64,
+            event_type: Self::event_type_from_i32(row.get("event_type")?),
+            timestamp: row.get::<_, i64>("event_timestamp")? as u64,
+            duration: row.get::<_, i64>("event_duration")? as u64,
         })
     }
 
@@ -1194,7 +1347,11 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration, w.icon_base64
+                w.browser_name, w.browser_url,
+                e.event_type AS event_type,
+                e.timestamp AS event_timestamp,
+                e.duration AS event_duration,
+                w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             ORDER BY e.timestamp ASC
@@ -1220,7 +1377,11 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration, w.icon_base64
+                w.browser_name, w.browser_url,
+                e.event_type AS event_type,
+                e.timestamp AS event_timestamp,
+                e.duration AS event_duration,
+                w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             WHERE e.timestamp <= ?2
@@ -1249,7 +1410,11 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration, w.icon_base64
+                w.browser_name, w.browser_url,
+                e.event_type AS event_type,
+                e.timestamp AS event_timestamp,
+                e.duration AS event_duration,
+                w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             WHERE e.event_type = ?1
@@ -1276,6 +1441,7 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
+                w.browser_name, w.browser_url,
                 e.event_type, e.timestamp, e.duration, w.icon_base64, w.id
             FROM events e
             JOIN window_activity w ON e.window_activity_id = w.id
@@ -1287,8 +1453,10 @@ impl Database {
         let events = stmt.query_map([process_name], |row| {
             let w_ts: i64 = row.get(17)?;
             let w_dur: i64 = row.get(18)?;
-            let e_ts: i64 = row.get(20)?;
-            let e_dur: i64 = row.get(21)?;
+            let browser_name: Option<String> = row.get(19)?;
+            let browser_url: Option<String> = row.get(20)?;
+            let e_ts: i64 = row.get(22)?;
+            let e_dur: i64 = row.get(23)?;
 
             Ok(EventModel {
                 window: Some(WindowModel {
@@ -1306,15 +1474,24 @@ impl Database {
                         width: row.get(10)?,
                         height: row.get(11)?,
                     },
-                    variant: WindowVariant::Desktop(WindowDesktop {}),
+                    variant: if let (Some(browser_name), Some(browser_url)) =
+                        (browser_name.clone(), browser_url.clone())
+                    {
+                        WindowVariant::Browser(WindowBrowser {
+                            browser: browser_name,
+                            url: browser_url,
+                        })
+                    } else {
+                        WindowVariant::Desktop(WindowDesktop {})
+                    },
 
                     is_minimized: row.get(12)?,
                     is_maximized: row.get(13)?,
                     is_visible: row.get(14)?,
                     is_focused: row.get(15)?,
                     monitor_id: row.get(16)?,
-                    icon_base64: row.get(22)?,
-                    id: Some(row.get(23)?),
+                    icon_base64: row.get(24)?,
+                    id: Some(row.get(25)?),
                     timestamp: w_ts as u64,
                     duration: w_dur as u64,
                 }),
@@ -1376,6 +1553,7 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
+                w.browser_name, w.browser_url,
                 e.event_type, e.timestamp, e.duration, w.icon_base64, w.id
             FROM events e
             JOIN window_activity w ON e.window_activity_id = w.id
@@ -1387,8 +1565,10 @@ impl Database {
         let events = stmt.query_map([limit], |row| {
             let w_ts: i64 = row.get(17)?;
             let w_dur: i64 = row.get(18)?;
-            let e_ts: i64 = row.get(20)?;
-            let e_dur: i64 = row.get(21)?;
+            let browser_name: Option<String> = row.get(19)?;
+            let browser_url: Option<String> = row.get(20)?;
+            let e_ts: i64 = row.get(22)?;
+            let e_dur: i64 = row.get(23)?;
 
             Ok(EventModel {
                 window: Some(WindowModel {
@@ -1406,7 +1586,16 @@ impl Database {
                         width: row.get(10)?,
                         height: row.get(11)?,
                     },
-                    variant: WindowVariant::Desktop(WindowDesktop {}),
+                    variant: if let (Some(browser_name), Some(browser_url)) =
+                        (browser_name.clone(), browser_url.clone())
+                    {
+                        WindowVariant::Browser(WindowBrowser {
+                            browser: browser_name,
+                            url: browser_url,
+                        })
+                    } else {
+                        WindowVariant::Desktop(WindowDesktop {})
+                    },
                     is_minimized: row.get(12)?,
                     is_maximized: row.get(13)?,
                     is_visible: row.get(14)?,
@@ -1414,8 +1603,8 @@ impl Database {
                     monitor_id: row.get(16)?,
                     timestamp: w_ts as u64,
                     duration: w_dur as u64,
-                    icon_base64: row.get(22)?,
-                    id: Some(row.get(23)?),
+                    icon_base64: row.get(24)?,
+                    id: Some(row.get(25)?),
                 }),
                 event_type: Self::event_type_from_i32(row.get(19)?),
                 timestamp: e_ts as u64,
@@ -1439,7 +1628,11 @@ impl Database {
                 w.left, w.top, w.right, w.bottom, w.width, w.height,
                 w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
                 w.monitor_id, w.timestamp, w.duration,
-                e.event_type, e.timestamp, e.duration, w.icon_base64
+                w.browser_name, w.browser_url,
+                e.event_type AS event_type,
+                e.timestamp AS event_timestamp,
+                e.duration AS event_duration,
+                w.icon_base64
             FROM events e
             LEFT JOIN window_activity w ON e.window_activity_id = w.id
             WHERE e.timestamp >= ?1

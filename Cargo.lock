@@ -5651,6 +5651,7 @@ dependencies = [
  "directories",
  "image",
  "once_cell",
+ "regex",
  "rfd 0.15.4",
  "rusqlite",
  "rusqlite_migration",
