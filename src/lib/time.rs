@@ -1,7 +1,6 @@
 use std::time::SystemTime;
 
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
-use dioxus::desktop::wry::cookie::time::Date;
 
 pub fn current_ts() -> u64 {
     chrono::prelude::DateTime::<chrono::Utc>::from(SystemTime::now()).timestamp_millis() as u64

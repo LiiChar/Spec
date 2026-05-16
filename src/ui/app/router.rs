@@ -1,4 +1,4 @@
-use crate::ui::{AppProvider, MainPage, SettingsPage, StatisticsPage, use_app};
+use crate::ui::{MainPage, SettingsPage, StatisticsPage, use_app};
 use dioxus::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -14,7 +14,7 @@ pub fn Router() -> Element {
     let page = context.page;
 
     rsx! {
-        match page.read().clone() {
+        match *page.read() {
             Page::Main => rsx! { MainPage {} },
             Page::Settings => rsx! { SettingsPage {} },
             Page::Statistics => rsx! { StatisticsPage {} },

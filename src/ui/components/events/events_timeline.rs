@@ -1,21 +1,17 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
-use dioxus::{
-    html::geometry::{euclid::Rect, Pixels},
-    prelude::*,
-};
-use dioxus_free_icons::icons::ld_icons::{LdArrowUpToLine, LdPlus};
+use chrono::{DateTime, Datelike, Duration, Local, Timelike};
+use dioxus::prelude::*;
+use dioxus_free_icons::icons::ld_icons::LdArrowUpToLine;
 use dioxus_free_icons::Icon;
 
 use crate::{
-    config::DATABASE_PATH,
-    core::{Database, EventModel, EventType, JobModel, database::database},
-    lib::{CronExpr, convert_ts_to_local_date, merge_events, merge_visual_density},
-    ui::{EventElement, JobFormModal, JobModal, use_settings},
+    core::{EventModel, EventType, JobModel},
+    lib::{CronExpr, convert_ts_to_local_date, merge_events},
+    ui::{EventElement, JobModal, use_settings},
 };
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum TimelineOrientation {
     Horizontal,
     Vertical,

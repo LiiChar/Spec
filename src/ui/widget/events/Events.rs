@@ -47,21 +47,21 @@ pub fn Events() -> Element {
                     class: "sticky top-1.5 z-100 rounded-md h-[26px] overflow-visible" ,
                     TabsTrigger { class: "py-0! h-full", value: "timeline".to_string(), "График" }
                     TabsTrigger { class: "py-0! h-full", value: "statistics".to_string(), "Статистика" }
-                    div {
-                        class: "absolute -right-2 translate-x-full bg-background/50 rounded-md h-[26px] transition-all w-full",
-                        Select {
-                            value: variant.read().as_str(),
-                            onchange: move |value: String| {
-                                variant.set(AppVariant::from_str(&value).unwrap_or_default());
-                            },
-                            SelectTrigger { class: "py-0.5! h-full text-sm" }
-                            SelectContent { 
-                                SelectItem { class: "py-0.5! text-sm", value: "events".to_string(), title: "События", "События" }
-                                SelectItem { class: "py-0.5! text-sm", value: "tags".to_string(), title: "Теги", "Теги" }
-                                SelectItem { class: "py-0.5! text-sm", value: "jobs".to_string(), title: "Задания", "Задания" }
-                            }
-                        }
-                    }
+                    // div {
+                    //     class: "absolute -right-2 translate-x-full bg-background/50 rounded-md h-[26px] transition-all w-full",
+                    //     Select {
+                    //         value: variant.read().as_str(),
+                    //         onchange: move |value: String| {
+                    //             variant.set(AppVariant::from_str(&value).unwrap_or_default());
+                    //         },
+                    //         SelectTrigger { class: "py-0.5! h-full text-sm" }
+                    //         SelectContent { 
+                    //             SelectItem { class: "py-0.5! text-sm", value: "events".to_string(), title: "События", "События" }
+                    //             SelectItem { class: "py-0.5! text-sm", value: "tags".to_string(), title: "Теги", "Теги" }
+                    //             SelectItem { class: "py-0.5! text-sm", value: "jobs".to_string(), title: "Задания", "Задания" }
+                    //         }
+                    //     }
+                    // }
                 }
 
                 TabsContent {

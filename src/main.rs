@@ -6,7 +6,7 @@ use core::*;
 use ui::*;
 use dioxus::prelude::*;
 
-use std::{path::Path, sync::Mutex, thread, time::Duration};
+use std::{path::Path, sync::{Arc, Mutex}, thread, time::Duration};
 
 use crossbeam_channel::Receiver;
 use dioxus::{
@@ -18,7 +18,7 @@ use once_cell::sync::Lazy;
 use crate::lib::{Builder, load_icon, load_settings};
 
 static RX: Lazy<Mutex<Option<Receiver<EventModel>>>> = Lazy::new(|| Mutex::new(None));
-static DB: Lazy<Mutex<Option<Database>>> = Lazy::new(|| Mutex::new(None));
+static DB: Lazy<Db> = Lazy::new(|| Arc::new(Mutex::new(Database::new(DATABASE_PATH))));
 
 const DB_BATCH_SIZE: usize = 64;
 const TRAY_ICON: Asset = asset!("/assets/tray_icon.png");
@@ -36,8 +36,7 @@ fn main() {
     let icon = load_icon(&Path::new(TRAY_ICON.bundled().absolute_source_path()));
 
     let window_config = WindowBuilder::new().with_decorations(false).with_window_icon(Some(icon));
-    let database = Database::new(DATABASE_PATH);
-    *DB.lock().unwrap() = Some(database);
+    DB.lock().unwrap();
 
     let (tx_forward, rx_forward) = crossbeam_channel::unbounded::<EventModel>();
     let (tx_db, rx_db) = crossbeam_channel::unbounded::<EventModel>();

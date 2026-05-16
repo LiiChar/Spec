@@ -1,12 +1,12 @@
 use std::cmp::Ordering;
 
-use chrono::{DateTime, Datelike, Duration, Local, TimeZone, Timelike};
+use chrono::{Local, Timelike};
 use dioxus::prelude::*;
 
 use crate::{
     core::{EventModel, EventType, JobModel},
     lib::{CronExpr, convert_ts_to_local_date, format_duration_short, get_process_color},
-    ui::{TimelineOrientation, Tooltip, TooltipAlign, use_app},
+    ui::{TimelineOrientation, Tooltip, TooltipAlign},
 };
 
 #[derive(Props, PartialEq, Clone)]
@@ -31,7 +31,7 @@ pub struct EventsElementProps {
 }
 
 pub fn sort_by_duration(a: &JobModel, b: &JobModel) -> Ordering {
-    (&b.end_ts - &b.start_ts).cmp(&((&a.end_ts - &a.start_ts)))
+    (b.end_ts - b.start_ts).cmp(&(a.end_ts - a.start_ts))
 }
 
 fn event_range_in_segment(
@@ -109,20 +109,20 @@ fn compute_event_lanes(
 
 #[component]
 pub fn EventElement(props: EventsElementProps) -> Element {
-    let app = use_app();
-    let mut jobs = props.jobs.clone();
-    let orientation = props.orientation.clone();
+    let mut jobs = props.jobs;
+    let orientation = props.orientation;
 
     jobs.sort_by(sort_by_duration);
 
     let mut selected_job = props.selected_job;
+    let has_events = !props.events.is_empty();
 
     let is_current_hour = {
         let now = Local::now().hour();
         now >= props.start_hour && now <= props.end_hour
     };
 
-    let mut count_job = use_signal(|| jobs.len());
+    let count_job = use_signal(|| jobs.len());
 
     rsx! {
         div {
@@ -133,7 +133,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                 } else {
                     "max-w-full"
                 },
-                if !props.events.is_empty() {
+                if has_events {
                     "bg-foreground/5 hover:bg-foreground/6"
                 } else {
                     "bg-foreground/3 hover:bg-foreground/3"
@@ -141,14 +141,10 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                 if is_current_hour { "current-hour" } else { "" },
                 props.class,
             ),
-            style: match orientation {
-                TimelineOrientation::Vertical => format!("{}", props.style),
-                TimelineOrientation::Horizontal => props.style.clone(),
-            },
+            style: props.style.clone(),
 
             {
                 jobs
-                    .clone()
                     .into_iter()
                     .enumerate()
                     .filter_map(|(i, job)| {
@@ -216,7 +212,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         let offset = (event_start_ms / total_ms) * 100.0;
                         let size = (duration_ms / total_ms) * 100.0;
 
-                        let is_select = match props.selected_job.read().clone() {
+                        let is_select = match props.selected_job.read().as_ref() {
                             Some(j) => {
                                 format!("{}{}{}", job.name, job.start_ts, job.end_ts)
                                     == format!("{}{}{}", j.name, j.start_ts, j.end_ts)
@@ -241,8 +237,8 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     },
                                     class: format!(
                                         "absolute group w-1 z-100 cursor-pointer transition-all overflow-hidden {} {}",
-                                        has_prev.then(|| "").unwrap_or("rounded-tl-sm"),
-                                        has_next.then(|| "").unwrap_or("rounded-bl-sm"),
+                                        if has_prev { "" } else { "rounded-tl-sm" },
+                                        if has_next { "" } else { "rounded-bl-sm" },
                                     ),
                                     style: format!(
                                         "{} background-color: {};",
@@ -252,7 +248,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                                     "top: {}%; height: {}%; width: {}; right: {}px;",
                                                     offset,
                                                     size.max(0.5),
-                                                    if is_select { "3px" } else { "3px" },
+                                                    "3px",
                                                     i * 3
                                                 )
                                             }
@@ -261,7 +257,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                                     "left: {}%; width: {}%; height: {}; top: {}px;",
                                                     offset,
                                                     size.max(0.5),
-                                                    if is_select { "3px" } else { "3px" },
+                                                    "3px",
                                                     i * 3
                                                 )
                                             }
@@ -283,7 +279,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
             }
 
             {
-                let mut events = props.events.clone();
+                let mut events = props.events;
 
                 // длинные сначала
                 events.sort_by(|a, b| b.duration.cmp(&a.duration));
@@ -297,12 +293,11 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                 let lane_count = lanes.iter().copied().max().unwrap_or(0) + 1;
 
                 events
-                    .clone()
-                    .iter()
+                    .into_iter()
                     .enumerate()
                     .map(move |(index, event)| {
                         let lanes_c = lanes.clone();
-                        let lane_count_c = lane_count.clone();
+                        let lane_count_c = lane_count;
 
                         let start_dt = convert_ts_to_local_date(event.timestamp);
                         let end_dt =
@@ -339,12 +334,8 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                             process_name.chars().take(10).collect();
 
                         let window_title = window_info
-                            .and_then(|w| Some(w.title.clone()))
+                            .map(|w| w.title.clone())
                             .unwrap_or_else(|| "N/A".to_string());
-
-                        let pid_str = window_info
-                            .map(|w| w.pid.to_string())
-                            .unwrap_or_else(|| "0".to_string());
 
                         let mut color = get_process_color(&process_name).to_owned();
 

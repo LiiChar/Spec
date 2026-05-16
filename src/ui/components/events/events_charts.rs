@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{Local, Timelike};
 use dioxus::prelude::*;
 
-use crate::{core::EventModel, ui::{AppProvider, use_app}};
+use crate::{core::EventModel, ui::use_app};
 
 #[derive(PartialEq, Clone)]
 pub enum ChartType {
@@ -30,9 +30,8 @@ pub fn EventsCharts(props: EventsChartsProps) -> Element {
     let context = use_app();
     let events = context.events;
 
-    let value = events.clone();
     let summary = use_memo(move || {
-        let items = &value;
+        let items = events.read();
         let total_time: u64 = items.iter().map(|event| event.duration).sum();
 
         let mut app_times: HashMap<String, u64> = HashMap::new();
@@ -87,7 +86,7 @@ pub fn EventsCharts(props: EventsChartsProps) -> Element {
 #[component]
 fn BarChart(data: Vec<(String, u64)>) -> Element {
     let max_time = data.iter().map(|(_, time)| *time).max().unwrap_or(1);
-    let mut sorted_data = data.clone();
+    let mut sorted_data = data;
     sorted_data.sort_by(|a, b| a.1.cmp(&b.1));
 
     rsx! {

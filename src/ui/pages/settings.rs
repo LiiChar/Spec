@@ -314,38 +314,27 @@ pub fn SettingsPage() -> Element {
                         button {
                             class: "rounded-md border border-border/40 bg-background px-3 py-2 text-sm text-foreground hover:bg-foreground/5 disabled:opacity-50",
                             disabled: is_busy(),
-                            onclick: move |_| {
-                                spawn(async move {
-                                    let Some(path) = pick_export_file() else {
-                                        return;
-                                    };
+                                onclick: move |_| {
+                                    if let Some(path) = pick_export_file() {
+                                        selected_export_file.set(path.display().to_string());
+                                        is_busy.set(true);
+                                        info(("Готовлю экспорт...".to_string(), None));
 
-                                    selected_export_file.set(path.display().to_string());
-                                    is_busy.set(true);
-                                    info(("Готовлю экспорт...".to_string(), None));
+                                        match export_data_to_json().and_then(|json| {
+                                            fs::write(&path, json).map_err(|err| err.to_string())
+                                        }) {
+                                            Ok(_) => {
+                                                selected_export_file.set(path.display().to_string());
+                                                info((format!("Экспорт сохранен: {}", path.display()), None));
+                                            }
+                                            Err(err) => {
+                                                info((format!("Ошибка экспорта: {err}"), None));
+                                            }
+                                        }
 
-                                    let result = tokio::task::spawn_blocking(move || {
-                                        let json = export_data_to_json()?;
-                                        fs::write(&path, json).map_err(|err| err.to_string())?;
-                                        Ok::<_, String>(path)
-                                    }).await;
-
-                                    match result {
-                                        Ok(Ok(path)) => {
-                                            selected_export_file.set(path.display().to_string());
-                                            info((format!("Экспорт сохранен: {}", path.display()), None));
-                                        }
-                                        Ok(Err(err)) => {
-                                            info((format!("Ошибка экспорта: {err}"), None));
-                                        }
-                                        Err(err) => {
-                                            info((format!("Ошибка задачи экспорта: {err}"), None));
-                                        }
+                                        is_busy.set(false);
                                     }
-
-                                    is_busy.set(false);
-                                });
-                            },
+                                },
                             "Экспорт в файл"
                         }
 
@@ -353,27 +342,20 @@ pub fn SettingsPage() -> Element {
                             class: "rounded-md border border-primary/40 bg-primary/20 px-3 py-2 text-sm text-foreground hover:bg-primary/30 disabled:opacity-50",
                             disabled: is_busy(),
                             onclick: move |_| {
-                                spawn(async move {
-                                    let Some(path) = pick_import_file() else {
-                                        return;
-                                    };
-
+                                if let Some(path) = pick_import_file() {
                                     selected_import_file.set(path.display().to_string());
                                     is_busy.set(true);
                                     info(("Импортирую данные...".to_string(), None));
 
-                                    let result = tokio::task::spawn_blocking(move || {
+                                    let res: Result<(usize, usize, usize), String> = (|| {
                                         let raw = fs::read_to_string(&path).map_err(|err| err.to_string())?;
-                                        let counts = import_data_from_json(&raw)?;
-                                        Ok::<_, String>((path, counts))
-                                    }).await;
+                                        import_data_from_json(&raw)
+                                    })();
 
-                                    match result {
-                                        Ok(Ok((path, (event_count, job_count, goal_count)))) => {
-                                            let refreshed_events =
-                                                with_database(|db| db.get_all_events()).unwrap_or_default();
-                                            let refreshed_jobs =
-                                                with_database(|db| db.get_jobs()).unwrap_or_default();
+                                    match res {
+                                        Ok((event_count, job_count, goal_count)) => {
+                                            let refreshed_events = with_database(|db| db.get_all_events()).unwrap_or_default();
+                                            let refreshed_jobs = with_database(|db| db.get_jobs()).unwrap_or_default();
 
                                             app.events.set(refreshed_events);
                                             app.jobs.set(refreshed_jobs);
@@ -381,16 +363,13 @@ pub fn SettingsPage() -> Element {
                                             selected_import_file.set(path.display().to_string());
                                             info((format!("Импортировано: events {event_count}, jobs {job_count}, goals {goal_count}."), None));
                                         }
-                                        Ok(Err(err)) => {
-                                            info((format!("Ошибка импорта: {err}"), None));
-                                        }
                                         Err(err) => {
-                                            info((format!("Ошибка задачи импорта: {err}"), None));
+                                            info((format!("Ошибка импорта: {err}"), None));
                                         }
                                     }
 
                                     is_busy.set(false);
-                                });
+                                }
                             },
                             "Импорт из файла"
                         }

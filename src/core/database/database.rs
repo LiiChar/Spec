@@ -20,8 +20,7 @@ where
     F: FnOnce(&Database) -> R,
 {
     let guard = DB.lock().expect("DB");
-    let db = guard.as_ref().expect("Database not initialized");
-    f(db)
+    f(&*guard)
 }
 
 pub fn with_database_mut<F, R>(f: F) -> R
@@ -29,14 +28,13 @@ where
     F: FnOnce(&mut Database) -> R,
 {
     let mut guard = DB.lock().expect("DB");
-    let db = guard.as_mut().expect("Database not initialized");
-    f(db)
+    f(&mut *guard)
 }
 
 impl Database {
     /// Создание + инициализация БД
     pub fn new(path: &str) -> Self {
-        let mut conn = Connection::open(path).expect("Failed to open DB");
+        let conn = Connection::open(path).expect("Failed to open DB");
 
         conn.busy_timeout(Duration::from_secs(5))
             .expect("Failed to configure DB busy timeout");

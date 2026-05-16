@@ -2,12 +2,11 @@ use chrono::Local;
 use dioxus::prelude::*;
 
 use crate::{
-    RX,
     core::with_database,
     lib::convert_ts_to_local_date,
     ui::{
-        provide_alert, provide_app, provide_settings, provide_toast, use_app, INITIAL_EVENT_LIMIT,
-        Layout, MAX_EVENTS_IN_MEMORY, Router, Tray,
+        provide_alert, provide_app, provide_db, provide_event_bus, provide_settings, provide_toast,
+        use_app, use_event_bus, INITIAL_EVENT_LIMIT, Layout, MAX_EVENTS_IN_MEMORY, Router, Tray,
     },
 };
 
@@ -16,10 +15,12 @@ const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 #[component]
 pub fn Root() -> Element {
+    provide_db();
     provide_settings();
     provide_app();
     provide_toast();
     provide_alert();
+    provide_event_bus();
 
     let context = use_app();
 
@@ -33,11 +34,12 @@ pub fn Root() -> Element {
 
     // ---------- load events ----------
     {
-        let selected_day = day.read().date_naive();
-        let selected_time = *time.read();
-        let selected_start_time = *start_time.read();
-
         use_effect(move || {
+            // read signals inside the effect so it re-runs when they change
+            let selected_day = day.read().date_naive();
+            let selected_time = *time.read();
+            let selected_start_time = *start_time.read();
+
             spawn(async move {
                 if let Some(start) = selected_start_time {
                     let end = selected_time;
@@ -77,9 +79,9 @@ pub fn Root() -> Element {
 
     // ---------- load jobs ----------
     {
-        let selected_day = day.read().date_naive();
-
         use_effect(move || {
+            let selected_day = day.read().date_naive();
+
             spawn(async move {
                 let start_of_day = selected_day
                     .and_hms_opt(0, 0, 0)
@@ -116,13 +118,10 @@ pub fn Root() -> Element {
 
         did_start.set(true);
 
-        let rx_opt = RX
-            .lock()
-            .ok()
-            .and_then(|rx_guard| rx_guard.as_ref().cloned());
+        let event_bus = use_event_bus();
+        let rx = event_bus.0;
 
-        if let Some(rx) = rx_opt {
-            spawn(async move {
+        spawn(async move {
                 loop {
                     let recv_result = tokio::task::spawn_blocking({
                         let rx = rx.clone();
@@ -154,7 +153,6 @@ pub fn Root() -> Element {
                     }
                 }
             });
-        }
     });
 
     rsx! {

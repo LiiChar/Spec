@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use chrono::{Local, TimeZone};
 use dioxus::prelude::*;
 
 use crate::{
-    core::{EventModel, EventType},
+    core::EventType,
     lib::convert_ts_to_local_date,
-    ui::{AppProvider, use_app},
+    ui::use_app,
 };
 
 #[component]
@@ -14,9 +13,8 @@ pub fn EventsStats() -> Element {
     let context = use_app();
     let events = context.events;
 
-    let value = events.clone();
     let stats = use_memo(move || {
-        let items = &value;
+        let items = events.read();
         let total_time: u64 = items.iter().map(|event| event.duration).sum();
 
         let active_time: u64 = items
