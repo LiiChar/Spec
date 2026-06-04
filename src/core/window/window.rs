@@ -127,6 +127,7 @@ pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
             timestamp: current_ts(),
             duration,
             icon_base64: icon,
+            color: String::new(),
         })
     }
 }

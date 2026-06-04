@@ -148,3 +148,11 @@
     --radius-xl: calc(var(--radius) + 4px);
   }
 }
+
+.glass {
+  @apply bg-secondary/20 backdrop-blur-md border border-border/40 shadow-md transition-colors;
+}
+
+.glass:hover {
+  @apply border-border/50;
+}

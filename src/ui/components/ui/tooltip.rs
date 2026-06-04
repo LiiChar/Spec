@@ -38,6 +38,8 @@ pub struct TooltipProps {
 pub fn Tooltip(props: TooltipProps) -> Element {
     let mut visible = use_signal(|| false);
     let mut position = use_signal(|| [0.0, 0.0]);
+    let mut tooltip_size = use_signal(|| [300.0, 120.0]);
+    let mut window_size = use_signal(|| [800.0, 600.0]);
     let id: Signal<String> = use_signal(|| Uuid::new_v4().to_string());
 
     let position_class = match props.at_cursor {
@@ -63,35 +65,56 @@ pub fn Tooltip(props: TooltipProps) -> Element {
 
             onmouseenter: move |evt| async move  {
                 spawn(async move {
-                    sleep(TOOLTIP_HIDE_DELAY).await;
-                    visible.set(true);
-                });
+                visible.set(true);
+
+                tokio::task::yield_now().await;
+                sleep(Duration::from_millis(10)).await;
                 if props.at_cursor {
                     evt.stop_propagation();
                     
-                    let tooltip_width = document::eval(
-                            format!(
-                                r#"const el=document.querySelector('.tooltip[id="{}"]');
-                                return el ? el.offsetWidth : 300;"#,
-                                id()
-                            ).as_str()
+                    let data = document::eval(
+                        format!(
+                            r#"
+                            const el = document.getElementById("{}");
+
+                            return {{
+                                found: el != null,
+                                width: el?.offsetWidth ?? 300,
+                                height: el?.offsetHeight ?? 120,
+                                windowWidth: window.innerWidth,
+                                windowHeight: window.innerHeight
+                            }};
+                            "#,
+                            id()
                         )
-                        .await
-                        .unwrap_or(json!(300))
+                        .as_str(),
+                    )
+                    .await
+                    .unwrap_or(json!({
+                        "width": 300,
+                        "height": 120,
+                        "windowWidth": 800,
+                        "windowHeight": 600
+                    }));
+
+                    let tooltip_width = data["width"]
                         .as_f64()
                         .unwrap_or(300.0);
 
-                    let tooltip_height = document::eval(
-                            format!(
-                                r#"const el=document.querySelector('.tooltip[id="{}"]');
-                                return el ? el.offsetHeight : 120;"#,
-                                id()
-                            ).as_str()
-                        )
-                        .await
-                        .unwrap_or(json!(120))
+                    let tooltip_height = data["height"]
                         .as_f64()
                         .unwrap_or(120.0);
+
+                    let window_width = data["windowWidth"]
+                        .as_f64()
+                        .unwrap_or(800.0);
+
+                    let window_height = data["windowHeight"]
+                        .as_f64()
+                        .unwrap_or(600.0);
+
+                    tooltip_size.set([tooltip_width, tooltip_height]);
+                    window_size.set([window_width, window_height]);
 
                     const BORDER_GAP: f64 = 4.0;
                     const BORDER_RIGHT_GAP: f64 = 14.0;
@@ -99,8 +122,8 @@ pub fn Tooltip(props: TooltipProps) -> Element {
                     let evt_x: f64 = evt.client_coordinates().x;
                     let evt_y: f64 = evt.client_coordinates().y;
                     
-                    let client_w = document::eval("return window.innerWidth").await.unwrap_or(json!(0)).as_f64().unwrap_or(800.0);
-                    let client_h = document::eval("return window.innerHeight").await.unwrap_or(json!(0)).as_f64().unwrap_or(600.0); 
+                    let client_w = window_width;
+                    let client_h = window_height;
 
                     let half_w = tooltip_width / 2.0;
                     let half_h = tooltip_height / 2.0;
@@ -116,6 +139,8 @@ pub fn Tooltip(props: TooltipProps) -> Element {
 
                     position.set([x, y]);
                 };
+                });
+
             },
 
             onmouseleave: move |_| {
@@ -142,30 +167,6 @@ pub fn Tooltip(props: TooltipProps) -> Element {
             onmousemove: move |evt: Event<MouseData>| async move {
                 if props.at_cursor {
                     evt.stop_propagation();
-                    
-                    let tooltip_width = document::eval(
-                            format!(
-                                r#"const el=document.querySelector('.tooltip[id="{}"]');
-                                return el ? el.offsetWidth : 300;"#,
-                                id()
-                            ).as_str()
-                        )
-                        .await
-                        .unwrap_or(json!(300))
-                        .as_f64()
-                        .unwrap_or(300.0);
-
-                    let tooltip_height = document::eval(
-                            format!(
-                                r#"const el=document.querySelector('.tooltip[id="{}"]');
-                                return el ? el.offsetHeight : 120;"#,
-                                id()
-                            ).as_str()
-                        )
-                        .await
-                        .unwrap_or(json!(120))
-                        .as_f64()
-                        .unwrap_or(120.0);
 
                     const BORDER_GAP: f64 = 4.0;
                     const BORDER_RIGHT_GAP: f64 = 14.0;
@@ -173,11 +174,11 @@ pub fn Tooltip(props: TooltipProps) -> Element {
                     let evt_x: f64 = evt.client_coordinates().x;
                     let evt_y: f64 = evt.client_coordinates().y;
                     
-                    let client_w = document::eval("return window.innerWidth").await.unwrap_or(json!(0)).as_f64().unwrap_or(800.0);
-                    let client_h = document::eval("return window.innerHeight").await.unwrap_or(json!(0)).as_f64().unwrap_or(600.0); 
+                    let client_w = window_size()[0];
+                    let client_h = window_size()[1];
 
-                    let half_w = tooltip_width / 2.0;
-                    let half_h = tooltip_height / 2.0;
+                    let half_w = tooltip_size()[0] / 2.0;
+                    let half_h = tooltip_size()[1] / 2.0;
 
 
                     let x = (evt_x)
