@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 
 use crate::{
     core::EventType,
-    lib::convert_ts_to_local_date,
+    lib::{convert_ts_to_local_date, format_duration_short},
     ui::use_app,
 };
 
@@ -81,14 +81,6 @@ pub fn EventsStats() -> Element {
         most_used_app,
     ) = stats();
 
-    // Helper to format time
-    let format_time = |t: u64| {
-        let hours = t / 3600000;
-        let minutes = (t % 3600000) / 60000;
-        let seconds = (t % 60000) / 1000;
-        format!("{}h {}m {}s", hours, minutes, seconds)
-    };
-
     let fmt_start_date = events
         .read()
         .first()
@@ -117,19 +109,19 @@ pub fn EventsStats() -> Element {
                     div { class: "text-xs text-muted-foreground",
                         "Общее время"
                         div { class: "text-base font-semibold text-foreground",
-                            "{format_time(total_time)}"
+                            "{format_duration_short(total_time)}"
                         }
                     }
                     div { class: "text-xs text-muted-foreground",
                         "Активное время"
                         div { class: "text-base font-semibold text-primary",
-                            "{format_time(active_time)}"
+                            "{format_duration_short(active_time)}"
                         }
                     }
                     div { class: "text-xs text-muted-foreground",
                         "Бездействие"
                         div { class: "text-base font-semibold text-foreground",
-                            "{format_time(idle_time)}"
+                            "{format_duration_short(idle_time)}"
                         }
                     }
                     div { class: "text-xs text-muted-foreground",
@@ -139,7 +131,7 @@ pub fn EventsStats() -> Element {
                     div { class: "text-xs text-muted-foreground",
                         "Средняя продолжительность"
                         div { class: "text-base font-semibold text-foreground",
-                            "{format_time(avg_event_duration)}"
+                            "{format_duration_short(avg_event_duration)}"
                         }
                     }
                     if let Some((app, active, idle, icon)) = most_used_app {
@@ -149,7 +141,7 @@ pub fn EventsStats() -> Element {
                                 "{app}"
                             }
                             div { class: "text-xs text-muted-foreground",
-                                "Актив: {format_time(active)}, Idle: {format_time(idle)}"
+                                "Актив: {format_duration_short(active)}, Idle: {format_duration_short(idle)}"
                             }
                         }
                     }
@@ -169,9 +161,9 @@ pub fn EventsStats() -> Element {
                                 }
                             }
                             div { class: "flex flex-col text-end",
-                                span { class: "text-xs text-foreground", "{format_time(active)}" }
+                                span { class: "text-xs text-foreground", "{format_duration_short(active)}" }
                                 span { class: "text-[10px] text-muted-foreground",
-                                    "{format_time(idle)} idle"
+                                    "{format_duration_short(idle)} idle"
                                 }
                             }
                         }

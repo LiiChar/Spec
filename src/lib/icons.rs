@@ -1,3 +1,4 @@
+use image::EncodableLayout;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::io::Read;
@@ -6,7 +7,8 @@ use std::sync::Mutex;
 use dioxus::desktop::tao::window::Icon;
 use std::fs::File;
 use dioxus::prelude::*;
-
+use color_thief::ColorFormat;
+use base64::Engine;
 use crate::core::EventModel;
 
 /// Кеш иконок: процесс -> base64 PNG
@@ -104,6 +106,26 @@ fn default_icon_data_uri() -> Option<String> {
     None
 }
 
+pub fn get_primary_icon_color(icon: String, process_name: String) -> String {
+    // Удаляем префикс data:image/...;base64, если есть
+    let base64_data = if icon.contains(";base64,") {
+        icon.split(";base64,").nth(1).unwrap_or(&icon)
+    } else {
+        &icon
+    };
+
+    // Декодируем base64
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(base64_data)
+        .expect("Failed to decode base64");
+
+    let img = image::load_from_memory(&decoded).expect("Invalid image");
+    let rgba = img.to_rgba8();
+    let raw_pixels = rgba.as_raw();
+    let colors = color_thief::get_palette(raw_pixels, ColorFormat::Rgba, 6, 10).expect("Failed get palette fron icon");
+
+    colors.first().map(|v| v.to_string()).unwrap_or_else(|| get_process_color(&process_name).to_string()).to_string()
+}
 /// Извлечь иконку из приложения
 fn extract_app_icon(process_name: &str) -> Option<String> {
     // Обычные расположения приложений
@@ -155,167 +177,161 @@ pub fn get_process_color(process_name: &str) -> &'static str {
 
 static PROCESS_COLORS: &[(&str, &str)] = &[
     // ---------------- Browsers ----------------
-    ("firefox", "bg-orange-500"),
-    ("chrome", "bg-blue-500"),
-    ("edge", "bg-sky-500"),
-    ("opera", "bg-red-500"),
-    ("brave", "bg-orange-600"),
-    ("vivaldi", "bg-red-400"),
-    ("zen", "bg-gray-500"),
+    ("firefox", "rgba(249, 115, 22, 1)"),     // orange-500
+    ("chrome", "rgba(59, 130, 246, 1)"),      // blue-500
+    ("edge", "rgba(14, 165, 233, 1)"),        // sky-500
+    ("opera", "rgba(239, 68, 68, 1)"),        // red-500
+    ("brave", "rgba(234, 88, 12, 1)"),        // orange-600
+    ("vivaldi", "rgba(248, 113, 113, 1)"),    // red-400
+    ("zen", "rgba(107, 114, 128, 1)"),        // gray-500
     // ---------------- Dev tools ----------------
-    ("code", "bg-blue-600"),
-    ("vscode", "bg-blue-600"),
-    ("visual studio", "bg-purple-700"),
-    ("idea", "bg-red-500"),
-    ("pycharm", "bg-green-500"),
-    ("webstorm", "bg-cyan-500"),
-    ("phpstorm", "bg-indigo-500"),
-    ("goland", "bg-sky-600"),
-    ("rider", "bg-rose-500"),
-    ("docker", "bg-blue-400"),
-    ("postman", "bg-orange-500"),
-    ("gitkraken", "bg-purple-500"),
-    ("github", "bg-gray-700"),
-    ("git", "bg-gray-600"),
+    ("code", "rgba(37, 99, 235, 1)"),         // blue-600
+    ("vscode", "rgba(37, 99, 235, 1)"),
+    ("visual studio", "rgba(126, 34, 206, 1)"), // purple-700
+    ("idea", "rgba(239, 68, 68, 1)"),
+    ("pycharm", "rgba(34, 197, 94, 1)"),      // green-500
+    ("webstorm", "rgba(6, 182, 212, 1)"),     // cyan-500
+    ("phpstorm", "rgba(99, 102, 241, 1)"),    // indigo-500
+    ("goland", "rgba(2, 132, 199, 1)"),       // sky-600
+    ("rider", "rgba(244, 63, 94, 1)"),        // rose-500
+    ("docker", "rgba(96, 165, 250, 1)"),      // blue-400
+    ("postman", "rgba(249, 115, 22, 1)"),
+    ("gitkraken", "rgba(168, 85, 247, 1)"),   // purple-500
+    ("github", "rgba(55, 65, 81, 1)"),        // gray-700
+    ("git", "rgba(75, 85, 99, 1)"),           // gray-600
     // ---------------- Communication ----------------
-    ("discord", "bg-indigo-500"),
-    ("slack", "bg-purple-500"),
-    ("telegram", "bg-sky-500"),
-    ("whatsapp", "bg-green-500"),
-    ("zoom", "bg-blue-400"),
-    ("teams", "bg-indigo-600"),
-    ("skype", "bg-blue-500"),
-    ("viber", "bg-purple-600"),
+    ("discord", "rgba(99, 102, 241, 1)"),
+    ("slack", "rgba(168, 85, 247, 1)"),
+    ("telegram", "rgba(14, 165, 233, 1)"),
+    ("whatsapp", "rgba(34, 197, 94, 1)"),
+    ("zoom", "rgba(96, 165, 250, 1)"),
+    ("teams", "rgba(79, 70, 229, 1)"),        // indigo-600
+    ("skype", "rgba(59, 130, 246, 1)"),
+    ("viber", "rgba(147, 51, 234, 1)"),       // purple-600
     // ---------------- Office ----------------
-    ("word", "bg-blue-700"),
-    ("excel", "bg-green-600"),
-    ("powerpoint", "bg-orange-600"),
-    ("outlook", "bg-blue-500"),
-    ("notion", "bg-gray-800"),
-    ("onenote", "bg-purple-500"),
-    ("libreoffice", "bg-blue-800"),
+    ("word", "rgba(29, 78, 216, 1)"),         // blue-700
+    ("excel", "rgba(22, 163, 74, 1)"),        // green-600
+    ("powerpoint", "rgba(234, 88, 12, 1)"),
+    ("outlook", "rgba(59, 130, 246, 1)"),
+    ("notion", "rgba(31, 41, 55, 1)"),        // gray-800
+    ("onenote", "rgba(168, 85, 247, 1)"),
+    ("libreoffice", "rgba(30, 64, 175, 1)"),  // blue-800
     // ---------------- Editors ----------------
-    ("notepad", "bg-gray-500"),
-    ("sublime", "bg-orange-500"),
-    ("atom", "bg-green-600"),
-    ("obsidian", "bg-purple-600"),
-    ("vim", "bg-green-700"),
-    ("neovim", "bg-green-800"),
+    ("notepad", "rgba(107, 114, 128, 1)"),
+    ("sublime", "rgba(249, 115, 22, 1)"),
+    ("atom", "rgba(22, 163, 74, 1)"),
+    ("obsidian", "rgba(147, 51, 234, 1)"),
+    ("vim", "rgba(21, 128, 61, 1)"),          // green-700
+    ("neovim", "rgba(22, 101, 52, 1)"),       // green-800
     // ---------------- System ----------------
-    ("explorer", "bg-yellow-600"),
-    ("finder", "bg-yellow-500"),
-    ("settings", "bg-gray-600"),
-    ("control panel", "bg-gray-700"),
+    ("explorer", "rgba(202, 138, 4, 1)"),     // yellow-600
+    ("finder", "rgba(234, 179, 8, 1)"),       // yellow-500
+    ("settings", "rgba(75, 85, 99, 1)"),
+    ("control panel", "rgba(55, 65, 81, 1)"),
     // ---------------- Terminal ----------------
-    ("terminal", "bg-slate-800"),
-    ("powershell", "bg-blue-900"),
-    ("cmd", "bg-gray-900"),
-    ("bash", "bg-gray-800"),
-    ("zsh", "bg-gray-900"),
+    ("terminal", "rgba(30, 41, 59, 1)"),      // slate-800
+    ("powershell", "rgba(30, 58, 138, 1)"),   // blue-900
+    ("cmd", "rgba(17, 24, 39, 1)"),           // gray-900
+    ("bash", "rgba(31, 41, 55, 1)"),
+    ("zsh", "rgba(17, 24, 39, 1)"),
     // ---------------- Media ----------------
-    ("spotify", "bg-green-500"),
-    ("vlc", "bg-orange-500"),
-    ("mpv", "bg-red-600"),
-    ("youtube", "bg-red-500"),
-    ("netflix", "bg-red-700"),
-    ("twitch", "bg-purple-600"),
-    ("obs", "bg-gray-700"),
-    ("audacity", "bg-blue-600"),
+    ("spotify", "rgba(34, 197, 94, 1)"),
+    ("vlc", "rgba(249, 115, 22, 1)"),
+    ("mpv", "rgba(220, 38, 38, 1)"),          // red-600
+    ("youtube", "rgba(239, 68, 68, 1)"),
+    ("netflix", "rgba(185, 28, 28, 1)"),      // red-700
+    ("twitch", "rgba(147, 51, 234, 1)"),
+    ("obs", "rgba(55, 65, 81, 1)"),
+    ("audacity", "rgba(37, 99, 235, 1)"),
     // ---------------- Design ----------------
-    ("figma", "bg-pink-500"),
-    ("photoshop", "bg-blue-900"),
-    ("illustrator", "bg-orange-700"),
-    ("after effects", "bg-purple-800"),
-    ("blender", "bg-orange-600"),
+    ("figma", "rgba(236, 72, 153, 1)"),       // pink-500
+    ("photoshop", "rgba(30, 58, 138, 1)"),
+    ("illustrator", "rgba(194, 65, 12, 1)"),  // orange-700
+    ("after effects", "rgba(126, 34, 206, 1)"),
+    ("blender", "rgba(234, 88, 12, 1)"),
     // ---------------- Game launchers ----------------
-    ("steam", "bg-slate-700"),
-    ("epic", "bg-gray-800"),
-    ("battle.net", "bg-blue-700"),
-    ("battlenet", "bg-blue-700"),
-    ("riot", "bg-red-600"),
-    ("riot client", "bg-red-600"),
-    ("origin", "bg-orange-600"),
-    ("ea app", "bg-orange-700"),
-    ("ubisoft", "bg-blue-600"),
-    ("uplay", "bg-blue-600"),
-    ("gog", "bg-purple-700"),
-    ("xbox", "bg-green-600"),
+    ("steam", "rgba(51, 65, 85, 1)"),         // slate-700
+    ("epic", "rgba(31, 41, 55, 1)"),
+    ("battle.net", "rgba(29, 78, 216, 1)"),
+    ("battlenet", "rgba(29, 78, 216, 1)"),
+    ("riot", "rgba(220, 38, 38, 1)"),
+    ("riot client", "rgba(220, 38, 38, 1)"),
+    ("origin", "rgba(234, 88, 12, 1)"),
+    ("ea app", "rgba(194, 65, 12, 1)"),
+    ("ubisoft", "rgba(37, 99, 235, 1)"),
+    ("uplay", "rgba(37, 99, 235, 1)"),
+    ("gog", "rgba(126, 34, 206, 1)"),
+    ("xbox", "rgba(22, 163, 74, 1)"),
     // ---------------- Games (Valve / FPS / MOBA) ----------------
-    ("cs2", "bg-yellow-500"),
-    ("csgo", "bg-yellow-500"),
-    ("counter-strike", "bg-yellow-500"),
-    ("dota", "bg-red-700"),
-    ("dota 2", "bg-red-700"),
-    ("half-life", "bg-orange-600"),
-    // Riot games
-    ("league of legends", "bg-blue-700"),
-    ("lol", "bg-blue-700"),
-    ("valorant", "bg-red-500"),
-    ("teamfight tactics", "bg-purple-600"),
-    // Blizzard
-    ("overwatch", "bg-orange-500"),
-    ("wow", "bg-blue-800"),
-    ("warcraft", "bg-blue-800"),
-    ("diablo", "bg-red-800"),
-    // AAA games
-    ("fortnite", "bg-indigo-500"),
-    ("minecraft", "bg-green-700"),
-    ("gta", "bg-emerald-600"),
-    ("cyberpunk", "bg-yellow-400"),
-    ("elden ring", "bg-yellow-600"),
-    ("witcher", "bg-red-700"),
-    ("skyrim", "bg-gray-400"),
-    ("starfield", "bg-sky-700"),
-    ("apex", "bg-red-600"),
-    ("pubg", "bg-yellow-600"),
-    // FPS
-    ("call of duty", "bg-gray-700"),
-    ("cod", "bg-gray-700"),
-    ("battlefield", "bg-blue-500"),
-    ("rainbow six", "bg-orange-600"),
-    ("r6", "bg-orange-600"),
-    // Indie
-    ("terraria", "bg-green-600"),
-    ("stardew", "bg-lime-500"),
-    ("hades", "bg-red-500"),
-    ("dead cells", "bg-purple-700"),
-    ("hollow knight", "bg-gray-800"),
-    ("factorio", "bg-orange-600"),
-    // Engines
-    ("unity", "bg-gray-700"),
-    ("unreal", "bg-black"),
-    ("godot", "bg-sky-500"),
-    // ---------------- Extra apps (≈30+) ----------------
-    ("dropbox", "bg-blue-500"),
-    ("onedrive", "bg-blue-600"),
-    ("google drive", "bg-green-500"),
-    ("zoominfo", "bg-indigo-600"),
-    ("figjam", "bg-pink-400"),
-    ("slackbot", "bg-purple-400"),
-    ("jira", "bg-blue-700"),
-    ("confluence", "bg-blue-800"),
-    ("trello", "bg-sky-600"),
-    ("asana", "bg-red-500"),
-    ("monday", "bg-pink-600"),
-    ("notion calendar", "bg-gray-700"),
-    ("calendly", "bg-blue-500"),
-    ("calendar", "bg-indigo-400"),
-    ("photos", "bg-cyan-500"),
-    ("paint", "bg-cyan-500"),
-    ("gimp", "bg-orange-400"),
-    ("inkscape", "bg-indigo-500"),
-    ("lightroom", "bg-blue-800"),
-    ("davinci resolve", "bg-black"),
-    ("handbrake", "bg-red-600"),
-    ("winrar", "bg-purple-700"),
-    ("7zip", "bg-gray-600"),
-    ("bluestacks", "bg-blue-400"),
-    ("android studio", "bg-green-700"),
-    ("xcode", "bg-gray-900"),
-    ("docker desktop", "bg-blue-500"),
-    ("postbird", "bg-yellow-600"),
-    ("dbeaver", "bg-orange-500"),
-    ("pgadmin", "bg-blue-700"),
+    ("cs2", "rgba(234, 179, 8, 1)"),
+    ("csgo", "rgba(234, 179, 8, 1)"),
+    ("counter-strike", "rgba(234, 179, 8, 1)"),
+    ("dota", "rgba(185, 28, 28, 1)"),
+    ("dota 2", "rgba(185, 28, 28, 1)"),
+    ("half-life", "rgba(234, 88, 12, 1)"),
+    ("league of legends", "rgba(29, 78, 216, 1)"),
+    ("lol", "rgba(29, 78, 216, 1)"),
+    ("valorant", "rgba(239, 68, 68, 1)"),
+    ("teamfight tactics", "rgba(147, 51, 234, 1)"),
+    ("overwatch", "rgba(249, 115, 22, 1)"),
+    ("wow", "rgba(30, 64, 175, 1)"),          // blue-800
+    ("warcraft", "rgba(30, 64, 175, 1)"),
+    ("diablo", "rgba(153, 27, 27, 1)"),       // red-800
+    ("fortnite", "rgba(99, 102, 241, 1)"),
+    ("minecraft", "rgba(21, 128, 61, 1)"),
+    ("gta", "rgba(5, 150, 105, 1)"),          // emerald-600
+    ("cyberpunk", "rgba(250, 204, 21, 1)"),   // yellow-400
+    ("elden ring", "rgba(202, 138, 4, 1)"),
+    ("witcher", "rgba(185, 28, 28, 1)"),
+    ("skyrim", "rgba(156, 163, 175, 1)"),     // gray-400
+    ("starfield", "rgba(3, 105, 161, 1)"),    // sky-700
+    ("apex", "rgba(220, 38, 38, 1)"),
+    ("pubg", "rgba(202, 138, 4, 1)"),
+    ("call of duty", "rgba(55, 65, 81, 1)"),
+    ("cod", "rgba(55, 65, 81, 1)"),
+    ("battlefield", "rgba(59, 130, 246, 1)"),
+    ("rainbow six", "rgba(234, 88, 12, 1)"),
+    ("r6", "rgba(234, 88, 12, 1)"),
+    ("terraria", "rgba(22, 163, 74, 1)"),
+    ("stardew", "rgba(132, 204, 22, 1)"),     // lime-500
+    ("hades", "rgba(239, 68, 68, 1)"),
+    ("dead cells", "rgba(126, 34, 206, 1)"),
+    ("hollow knight", "rgba(31, 41, 55, 1)"),
+    ("factorio", "rgba(234, 88, 12, 1)"),
+    ("unity", "rgba(55, 65, 81, 1)"),
+    ("unreal", "rgba(0, 0, 0, 1)"),
+    ("godot", "rgba(14, 165, 233, 1)"),
+    // ---------------- Extra apps ----------------
+    ("dropbox", "rgba(59, 130, 246, 1)"),
+    ("onedrive", "rgba(37, 99, 235, 1)"),
+    ("google drive", "rgba(34, 197, 94, 1)"),
+    ("zoominfo", "rgba(79, 70, 229, 1)"),
+    ("figjam", "rgba(244, 114, 182, 1)"),     // pink-400
+    ("slackbot", "rgba(192, 132, 252, 1)"),   // purple-400
+    ("jira", "rgba(29, 78, 216, 1)"),
+    ("confluence", "rgba(30, 64, 175, 1)"),
+    ("trello", "rgba(2, 132, 199, 1)"),
+    ("asana", "rgba(239, 68, 68, 1)"),
+    ("monday", "rgba(219, 39, 119, 1)"),      // pink-600
+    ("notion calendar", "rgba(55, 65, 81, 1)"),
+    ("calendly", "rgba(59, 130, 246, 1)"),
+    ("calendar", "rgba(129, 140, 248, 1)"),   // indigo-400
+    ("photos", "rgba(6, 182, 212, 1)"),
+    ("paint", "rgba(6, 182, 212, 1)"),
+    ("gimp", "rgba(251, 146, 60, 1)"),        // orange-400
+    ("inkscape", "rgba(99, 102, 241, 1)"),
+    ("lightroom", "rgba(30, 64, 175, 1)"),
+    ("davinci resolve", "rgba(0, 0, 0, 1)"),
+    ("handbrake", "rgba(220, 38, 38, 1)"),
+    ("winrar", "rgba(126, 34, 206, 1)"),
+    ("7zip", "rgba(75, 85, 99, 1)"),
+    ("bluestacks", "rgba(96, 165, 250, 1)"),
+    ("android studio", "rgba(21, 128, 61, 1)"),
+    ("xcode", "rgba(17, 24, 39, 1)"),
+    ("docker desktop", "rgba(59, 130, 246, 1)"),
+    ("postbird", "rgba(202, 138, 4, 1)"),
+    ("dbeaver", "rgba(249, 115, 22, 1)"),
+    ("pgadmin", "rgba(29, 78, 216, 1)"),
 ];
 
 pub fn get_process_color_gradient(process_name: &str) -> &'static str {

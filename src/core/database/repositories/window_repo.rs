@@ -76,8 +76,6 @@ impl WindowRepository {
 
     /// Insert a new window activity record
     pub fn insert(conn: &Connection, window: &WindowModel) -> Result<i64> {
-        let icon_ref = icon_file_name(&window.process_path);
-
         conn.execute(
             &format!(
                 r#"
@@ -104,7 +102,7 @@ impl WindowRepository {
                 ":hwnd": window.hwnd,
                 ":title": &window.title,
                 ":class_name": &window.class_name,
-                ":icon_base64": icon_ref,
+                ":icon_base64": &window.icon_base64,
                 ":process_name": &window.process_name,
                 ":process_path": &window.process_path,
                 ":pid": window.pid,
@@ -129,7 +127,7 @@ impl WindowRepository {
                 ":monitor_id": window.monitor_id.map(|v| v as i32),
                 ":timestamp": window.timestamp as i64,
                 ":duration": window.duration as i64,
-                ":color": "bg-secondary/20",
+                ":color": window.color,
             },
         )?;
 

@@ -2,7 +2,7 @@
 /// Manages event records
 
 use rusqlite::{Connection, Result};
-use crate::core::EventModel;
+use crate::{core::{EventModel, EventType, Rect, WindowBrowser, WindowDesktop, WindowModel, WindowRepository, WindowVariant}, lib::extract_icon_events};
 use super::super::schema::events as schema;
 
 pub struct EventRepository;
@@ -10,7 +10,11 @@ pub struct EventRepository;
 impl EventRepository {
     /// Insert a single event
     pub fn insert(conn: &Connection, event: &EventModel) -> Result<()> {
-        let window_id: Option<i64> = None;
+        let mut window_id: Option<i64> = None;
+
+        if event.window.is_some() {
+            window_id = Some(WindowRepository::insert(&conn, event.window.as_ref().unwrap())?);
+        }
         
         conn.execute(
             &format!(
@@ -44,7 +48,11 @@ impl EventRepository {
         let tx = conn.transaction()?;
         
         for event in events {
-            let window_id: Option<i64> = None;
+            let mut window_id: Option<i64> = None;
+
+            if event.window.is_some() {
+                window_id = Some(WindowRepository::insert(&tx, event.window.as_ref().unwrap())?);
+            }
             
             tx.execute(
                 &format!(
@@ -125,80 +133,75 @@ impl EventRepository {
     /// Get events within a time range
     pub fn get_in_range(conn: &Connection, from_ts: i64, to_ts: i64) -> Result<Vec<EventModel>> {
         let mut stmt = conn.prepare(
-            &format!(
-                "SELECT {} FROM {} WHERE {} >= ?1 AND {} <= ?2 ORDER BY {} DESC",
-                &[
-                    schema::COL_ID,
-                    schema::COL_WINDOW_ACTIVITY_ID,
-                    schema::COL_EVENT_TYPE,
-                    schema::COL_TIMESTAMP,
-                    schema::COL_DURATION,
-                ].join(", "),
-                schema::TABLE,
-                schema::COL_TIMESTAMP,
-                schema::COL_TIMESTAMP,
-                schema::COL_TIMESTAMP
-            )
+            r#"
+            SELECT
+                w.hwnd, w.title, w.class_name,
+                w.process_name, w.process_path, w.pid,
+                w.left, w.top, w.right, w.bottom, w.width, w.height,
+                w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
+                w.monitor_id, w.timestamp, w.duration,
+                w.browser_name, w.browser_url,
+                e.event_type AS event_type,
+                e.timestamp AS event_timestamp,
+                e.duration AS event_duration,
+                w.icon_base64 as icon_base64,
+                w.color as color
+            FROM events e
+            LEFT JOIN window_activity w ON e.window_activity_id = w.id
+            WHERE e.timestamp <= ?2
+            AND (e.timestamp + e.duration) >= ?1
+            ORDER BY e.timestamp ASC
+            "#,
         )?;
 
-        let rows = stmt.query_map([from_ts, to_ts], |row| {
-            let event_type_i32: i32 = row.get(2)?;
-            let event_type = match event_type_i32 {
-                0 => crate::core::EventType::Idle,
-                1 => crate::core::EventType::WindowSwitch,
-                2 => crate::core::EventType::Keyboard,
-                3 => crate::core::EventType::Mouse,
-                _ => crate::core::EventType::Idle,
-            };
+        let events = stmt.query_map([from_ts, to_ts], |row| row_to_event(row))?;
 
-            Ok(EventModel {
-                window: None,
-                event_type,
-                timestamp: row.get::<_, i64>(3)? as u64,
-                duration: row.get::<_, i64>(4)? as u64,
-            })
-        })?;
+        let events = events.filter_map(Result::ok).collect();
 
-        Ok(rows.filter_map(Result::ok).collect())
+        let events = extract_icon_events(events);
+
+        Ok(events)
     }
 
     /// Get events since a specific timestamp
     pub fn get_since(conn: &Connection, timestamp: i64, limit: i64) -> Result<Vec<EventModel>> {
         let mut stmt = conn.prepare(
-            &format!(
-                "SELECT {} FROM {} WHERE {} >= ?1 ORDER BY {} DESC LIMIT ?2",
-                &[
-                    schema::COL_ID,
-                    schema::COL_WINDOW_ACTIVITY_ID,
-                    schema::COL_EVENT_TYPE,
-                    schema::COL_TIMESTAMP,
-                    schema::COL_DURATION,
-                ].join(", "),
-                schema::TABLE,
-                schema::COL_TIMESTAMP,
-                schema::COL_TIMESTAMP
-            )
+            r#"
+            SELECT
+                w.hwnd, w.title, w.class_name,
+                w.process_name, w.process_path, w.pid,
+                w.left, w.top, w.right, w.bottom, w.width, w.height,
+                w.is_minimized, w.is_maximized, w.is_visible, w.is_focused,
+                w.monitor_id, w.timestamp, w.duration,
+                w.browser_name, w.browser_url,
+                e.event_type AS event_type,
+                e.timestamp AS event_timestamp,
+                e.duration AS event_duration,
+                w.icon_base64,
+                w.color
+            FROM events e
+            LEFT JOIN window_activity w ON e.window_activity_id = w.id
+            WHERE e.timestamp >= ?1
+            ORDER BY e.timestamp DESC
+            LIMIT ?2
+            "#,
         )?;
 
-        let rows = stmt.query_map([timestamp, limit], |row| {
-            let event_type_i32: i32 = row.get(2)?;
-            let event_type = match event_type_i32 {
-                0 => crate::core::EventType::Idle,
-                1 => crate::core::EventType::WindowSwitch,
-                2 => crate::core::EventType::Keyboard,
-                3 => crate::core::EventType::Mouse,
-                _ => crate::core::EventType::Idle,
-            };
+        let mut events = Vec::new();
 
-            Ok(EventModel {
-                window: None,
-                event_type,
-                timestamp: row.get::<_, i64>(3)? as u64,
-                duration: row.get::<_, i64>(4)? as u64,
-            })
-        })?;
+        let rows = stmt.query_map([timestamp, limit], |row| row_to_event(row))?;
 
-        Ok(rows.filter_map(Result::ok).collect())
+        for row in rows {
+            match row {
+                Ok(event) => events.push(event),
+                Err(err) => println!("DB row error: {:?}", err),
+            }
+        }
+
+        let mut events = extract_icon_events(events);
+
+        events.reverse();
+        Ok(events)
     }
 }
 
@@ -211,3 +214,70 @@ mod tests {
         assert_eq!(schema::TABLE, "events");
     }
 }
+
+fn row_to_event(row: &rusqlite::Row) -> Result<EventModel> {
+        let hwnd: Option<i64> = row.get("hwnd").ok();
+
+        let window = if hwnd.is_some() {
+            let browser_name: Option<String> = row.get("browser_name")?;
+            let browser_url: Option<String> = row.get("browser_url")?;
+            let variant = if let (Some(browser_name), Some(browser_url)) =
+                (browser_name.clone(), browser_url.clone())
+            {
+                WindowVariant::Browser(WindowBrowser {
+                    browser: browser_name,
+                    url: browser_url,
+                })
+            } else {
+                WindowVariant::Desktop(WindowDesktop {})
+            };
+
+            Some(WindowModel {
+                id: None,
+                hwnd: row.get("hwnd")?,
+                title: row.get("title")?,
+                class_name: row.get("class_name")?,
+                process_name: row.get("process_name")?,
+                process_path: row.get("process_path")?,
+                pid: row.get("pid")?,
+                rect: Rect {
+                    left: row.get("left")?,
+                    top: row.get("top")?,
+                    right: row.get("right")?,
+                    bottom: row.get("bottom")?,
+                    width: row.get("width")?,
+                    height: row.get("height")?,
+                },
+                variant,
+                is_minimized: row.get("is_minimized")?,
+                is_maximized: row.get("is_maximized")?,
+                is_visible: row.get("is_visible")?,
+                is_focused: row.get("is_focused")?,
+                monitor_id: row.get("monitor_id")?,
+                timestamp: row.get::<_, i64>("timestamp")? as u64,
+                duration: row.get::<_, i64>("duration")? as u64,
+                icon_base64: row.get("icon_base64").ok(),
+                color: row.get("color").unwrap_or_else(|_| "rgba(0,0,0,1)".to_string()),
+            })
+        } else {
+            None
+        };
+
+        Ok(EventModel {
+            window,
+            event_type: event_type_from_i32(row.get("event_type")?),
+            timestamp: row.get::<_, i64>("event_timestamp")? as u64,
+            duration: row.get::<_, i64>("event_duration")? as u64,
+        })
+    }
+
+
+        fn event_type_from_i32(value: i32) -> EventType {
+        match value {
+            0 => EventType::Idle,
+            1 => EventType::WindowSwitch,
+            2 => EventType::Keyboard,
+            3 => EventType::Mouse,
+            _ => EventType::Idle,
+        }
+    }

@@ -2,10 +2,11 @@ use std::cmp::Ordering;
 
 use chrono::{Local, Timelike};
 use dioxus::prelude::*;
+use palette::{Srgba, WithAlpha};
 
 use crate::{
     core::{EventModel, EventType, JobModel},
-    lib::{CronExpr, convert_ts_to_local_date, format_duration_short, get_process_color},
+    lib::{CronExpr, color::{foreground_color, idle_color, set_alpha, soften_color}, convert_ts_to_local_date, format_duration_short, get_process_color},
     ui::{TimelineOrientation, Tooltip, TooltipAlign},
 };
 
@@ -337,11 +338,16 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                             .map(|w| w.title.clone())
                             .unwrap_or_else(|| "N/A".to_string());
 
-                        let mut color = get_process_color(&process_name).to_owned();
+                        let is_idle = event.event_type == EventType::Idle;
+                        let color = window_info
+                            .map(|w| w.color.clone() ).unwrap_or_else(|| "rgba(0,0,0,1)".to_string());
 
-                        if matches!(event.event_type, EventType::Idle) {
-                            color += "/50";
+                        let mut evt_color = soften_color(&color, 0.4);
+
+                        if is_idle {
+                            evt_color = idle_color(&evt_color);
                         }
+
 
                         let track_px = match props.orientation {
                             TimelineOrientation::Vertical => {
@@ -370,20 +376,18 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         };
 
                         let lane = lanes_c[index];
-                        let lane_thickness = 100.0 / lane_count_c as f32;
 
-                        let is_idle = event.event_type == EventType::Idle;
 
                         rsx! {
                             div {
                                 key: "{event.timestamp}",
 
                                 class: format!(
-                                    "timeline-event left-1 right-1 absolute group cursor-pointer transition-all overflow-visible rounded-[2px] {}",
-                                    color
+                                    "timeline-event left-1 right-1 absolute group cursor-pointer transition-all overflow-visible rounded-[2px]",
+                                    
                                 ),
 
-                                style: format!("{} {}",match props.orientation {
+                                style: format!("{} {} {}",match props.orientation {
                                     TimelineOrientation::Vertical => {
                                         if is_micro {
                                             format!(
@@ -420,7 +424,8 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                             3
                                         },
                                         (count_job() + 1) * 3
-                                    )
+                                    ),
+                                    format!("background-color: {};", evt_color)
                                 ),
 
                                 Tooltip {
@@ -429,8 +434,8 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     target: Some({
                                         rsx! {
                                             div {
-                                                class: "p-2 whitespace-nowrap",
-                                                style: format!("min-width: 220px; border-left: 1px solid {};", color),
+                                                class: "p-2 whitespace-nowrap -ml-1",
+                                                style: format!("min-width: 220px; border-left: 3px solid {};", color),
 
                                                 div {
                                                     class: "flex gap-2 items-center overflow-hidden text-ellipsis",
@@ -464,24 +469,24 @@ pub fn EventElement(props: EventsElementProps) -> Element {
 
                                 if !is_micro && lane == 0 && label.is_some() {
                                     div {
-                                        class: "absolute inset-0 left-8 right-4 px-1 flex items-center justify-center pointer-events-none select-none text-[10px]",
+                                        class: format!("absolute inset-0 left-8 right-4 px-1 flex items-center justify-center pointer-events-none select-none text-[10px] {}", foreground_color(&color, "text-background".to_owned(), "text-foreground".to_owned())),
                                         div {
                                             class: "flex gap-1 items-center w-full justify-between pointer-events-none select-none",
 
                                             if let Some(label) = label {
                                                 div {
                                                     class: "flex gap-1 items-center justify-center",
-                                                    div {
-                                                        class: format!("w-1 h-1 rounded-full bg-primary transition-all {}",
-                                                            if is_idle {
-                                                                "bg-gray-500"
-                                                            } else {
-                                                                ""
-                                                            }
-                                                        ),
-                                                    }
+                                                    // div {
+                                                    //     class: format!("w-1 h-1 rounded-full bg-primary transition-all {}",
+                                                    //         if is_idle {
+                                                    //             "bg-gray-500"
+                                                    //         } else {
+                                                    //             ""
+                                                    //         }
+                                                    //     ),
+                                                    // }
                                                     span {
-                                                        class: "truncate whitespace-nowrap font-medium text-white/90 leading-none",
+                                                        class: "truncate whitespace-nowrap font-medium leading-none",
                                                         "{label}"
                                                     }
                                                 }

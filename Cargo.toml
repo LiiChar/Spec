@@ -42,6 +42,7 @@ rusqlite_migration = "2.5.0"
 web-sys = "0.3.98"
 browser-url = "0.1.1"
 color-thief = "0.2.2"
+palette = "0.7.6"
 [dependencies.uuid]
 version = "1.23.2"
 features = [

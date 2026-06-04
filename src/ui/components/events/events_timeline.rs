@@ -7,7 +7,7 @@ use dioxus_free_icons::Icon;
 
 use crate::{
     core::{EventModel, EventType, JobModel},
-    lib::{CronExpr, convert_ts_to_local_date, merge_events},
+    lib::{CronExpr, color::foreground_color, convert_ts_to_local_date, merge_events},
     ui::{EventElement, JobModal, use_settings},
 };
 
@@ -352,12 +352,13 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                             {
                                 event_jobs.push(job.clone());
                             }
+
                         });
 
                         rsx! {
                             div {
                                 key: "{start_hour}-{end_hour}", 
-                                class: "relative border-dashed border-border/10 border-b-[1px] last:border-b-0",
+                                class: format!("relative border-dashed border-border/10 border-b-[1px] last:border-b-0"),
                                 onclick: move |_| selected_hour.set(Some(start_hour)),
 
                                 style: format!("height: {}px;", height as i32),
@@ -381,7 +382,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                             evt.stop_propagation();
                                             selected_hour.set(None);
                                         },
-                                        class: "absolute z-40  rounded-md p-1 right-1 top-1 glass text-xs opacity-60",
+                                        class: "absolute z-10  rounded-md p-1 right-1 top-1 glass text-xs opacity-60 cursor-pointer",
                                         Icon { icon: LdArrowUpToLine, height: 12, width: 12 }
                                     }
                                 }
@@ -392,7 +393,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                 if hour_count > 1 {
                                     div { class: "absolute z-2 left-2 top-1 text-xs opacity-60", "{start_hour}:00-{end_hour}:00" }
                                 } else {
-                                    div { class: "absolute z-2 left-1 top-1 text-xs opacity-60", "{start_hour}:00" }
+                                    div { class: format!("absolute z-2 left-{} top-1 text-xs opacity-60", if is_selected { "2" } else { "1" }), "{start_hour}:00" }
                                 }
 
                                 div {
@@ -400,6 +401,13 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                     {(0..5).map(|i| {
                                         rsx! {
                                             div { class: "h-full w-[1px] border-dashed border-border/10 border-l-[1px]" }
+                                        }
+                                    })}
+                                }
+                                if is_selected {
+                                    {(1..6).map(|i| {
+                                        rsx! {
+                                            div { class: "absolute left-2 z-40 text-xs opacity-60", style: format!("top: calc(100%/6*{})", i), {format!("{}:{}",start_hour, 60 / 6 * i)} }
                                         }
                                     })}
                                 }

@@ -65,7 +65,7 @@ pub fn TabsList(props: ChildrenProps) -> Element {
     let class = match ctx.variant {
         TabsVariant::Default => "border-b border-border/40",
         TabsVariant::Rounded => {
-            "border border-border/40 rounded-lg bg-secondary/40 backdrop-blur-md"
+            "rounded-lg glass"
         }
     };
 

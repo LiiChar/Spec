@@ -25,7 +25,7 @@ use std::fs::File;
 
 use crate::core::{Rect, WindowBrowser, WindowDesktop, WindowModel, WindowVariant};
 use crate::lib::{
-    current_ts, get_class_name, get_current_monitor, get_idle_time, get_window_placement,
+    current_ts, get_class_name, get_current_monitor, get_idle_time, get_primary_icon_color, get_window_placement
 };
 
 const ICONS_DIR: Asset = asset!("/assets/icons");
@@ -94,6 +94,8 @@ pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
 
         let is_browser = is_browser_active();
 
+        let color = get_primary_icon_color(icon.clone().unwrap_or_default(), process_name.clone());
+
         Some(WindowModel {
             id: None,
             hwnd: hwnd.0 as isize,
@@ -127,7 +129,7 @@ pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
             timestamp: current_ts(),
             duration,
             icon_base64: icon,
-            color: String::new(),
+            color
         })
     }
 }
