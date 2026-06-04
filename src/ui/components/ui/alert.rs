@@ -50,111 +50,105 @@ pub fn Alerter() -> Element {
     };
 
     rsx! {
-        div {
-            class: "fixed flex flex-col gap-1 justify-center z-50 {t_align}",
+        div { class: "fixed flex flex-col gap-1 justify-center z-50 {t_align}",
             if settings.settings.read().enable_notifications {
-                {alerts.read().iter().cloned().map(|alert| {
-                    let border = match alert.t {
-                        AlertType::Info => "border-border/40",
-                        AlertType::Success => "border-green-400/30",
-                        AlertType::Error => "border-red-700/30",
-                    };
-
-                    let is_closing = closing.read().contains(&alert.id);
-
-                    rsx! {
-                        div {
-                            key: "{alert.id}",
-
-                            class: format!("{border} bg-secondary/30 p-2 border text-xs rounded-lg backdrop-blur-lg {te_align_show} {}",
-                                if is_closing { te_align_exit } else { "" }
-                            ),
-
-                            // onmounted: {
-                            //     let mut closing = closing;
-                            //     let id = alert.id;
-                            //     let timeout = alert.timeout;
-
-                            //     move |_| {
-                            //         spawn(async move {
-                            //             sleep(Duration::from_millis(
-                            //                 (timeout as u64).saturating_sub(200)
-                            //             )).await;
-
-                            //             closing.write().insert(id);
-                            //         });
-                            //     }
-                            // },
-
-                            div {
-                                class: "flex justify-between gap-3 items-start relative pr-[32px] group",
-
+                {
+                    alerts
+                        .read()
+                        .iter()
+                        .cloned()
+                        .map(|alert| {
+                            let border = match alert.t {
+                                AlertType::Info => "border-border/40",
+                                AlertType::Success => "border-green-400/30",
+                                AlertType::Error => "border-red-700/30",
+                            };
+                            let is_closing = closing.read().contains(&alert.id);
+                            rsx! {
                                 div {
-                                    class: "flex flex-col gap-0.5",
+                                    key: "{alert.id}",
 
-                                    span {
-                                        class: "text-base",
-                                        "{alert.title}"
+                                    class: format!(
+                                        "{border} bg-secondary/30 p-2 border text-xs rounded-lg backdrop-blur-lg {te_align_show} {}",
+                                        if is_closing { te_align_exit } else { "" },
+                                    ),
+
+                                    // onmounted: {
+                                    //     let mut closing = closing;
+                                    //     let id = alert.id;
+                                    //     let timeout = alert.timeout;
+
+                                    //     move |_| {
+                                    //         spawn(async move {
+                                    //             sleep(Duration::from_millis(
+                                    //                 (timeout as u64).saturating_sub(200)
+                                    //             )).await;
+
+                                    //             closing.write().insert(id);
+                                    //         });
+                                    //     }
+                                    // },
+                                    div { class: "flex justify-between gap-3 items-start relative pr-[32px] group",
+
+                                        div { class: "flex flex-col gap-0.5",
+
+                                            span { class: "text-base", "{alert.title}" }
+
+                                            if let Some(desc) = &alert.description {
+                                                span { class: "text-xs text-muted-foreground/50", "{desc}" }
+                                            }
+                                        }
+
+                                        button {
+                                            class: "opacity-0 max-h-[24px] max-w-[24px] min-h-[24px] min-w-[24px] aspect-square group-hover:opacity-100 absolute right-0 top-1/2 -translate-y-1/2 z-1 rounded-full bg-secondary/40 p-0.5 text-xs text-foreground/50 hover:bg-secondary/50 hover:text-foreground/70 transition-colors",
+
+                                            onclick: move |_| {
+                                                let mut closing = closing;
+                                                let id = alert.id;
+
+                                                if closing.read().contains(&id) {
+                                                    return;
+                                                }
+
+                                                closing.write().insert(id);
+
+                                                spawn(async move {
+                                                    sleep(Duration::from_millis(200)).await;
+                                                    clear(id)
+                                                });
+                                            },
+
+                                            Icon { icon: LdX }
+                                        }
                                     }
 
-                                    if let Some(desc) = &alert.description {
-                                        span {
-                                            class: "text-xs text-muted-foreground/50",
-                                            "{desc}"
+                                    div { class: "flex justify-end gap-2 mt-3",
+
+                                        Button {
+                                            size: ButtonSize::Sm,
+                                            onclick: move |_| {
+                                                cancel(alert.id);
+                                            },
+                                            "Отмена"
+                                        }
+
+                                        Button {
+                                            size: ButtonSize::Sm,
+                                            variant: ButtonVariant::Error,
+                                            onclick: move |_| {
+                                                agree(alert.id);
+                                            },
+                                            "Согласиться"
                                         }
                                     }
                                 }
-
-                                button {
-                                    class: "opacity-0 max-h-[24px] max-w-[24px] min-h-[24px] min-w-[24px] aspect-square group-hover:opacity-100 absolute right-0 top-1/2 -translate-y-1/2 z-1 rounded-full bg-secondary/40 p-0.5 text-xs text-foreground/50 hover:bg-secondary/50 hover:text-foreground/70 transition-colors",
-
-                                    onclick: move |_| {
-                                        let mut closing = closing;
-                                        let id = alert.id;
-
-                                        if closing.read().contains(&id) {
-                                            return;
-                                        }
-
-                                        closing.write().insert(id);
-
-                                        spawn(async move {
-                                            sleep(Duration::from_millis(200)).await;
-                                            clear(id)
-                                        });
-                                    },
-
-                                    Icon { icon: LdX }
-                                }
                             }
-
-                            div {
-                                class: "flex justify-end gap-2 mt-3",
-
-                                Button {
-                                    size: ButtonSize::Sm,
-                                    onclick: move |_| {
-                                        cancel(alert.id);
-                                    },
-                                    "Отмена"
-                                }
-
-                                Button {
-                                    size: ButtonSize::Sm,
-                                    variant: ButtonVariant::Error,
-                                    onclick: move |_| {
-                                        agree(alert.id);
-                                    },
-                                    "Согласиться"
-                                }
-                            }
-                        }
-                    }
-                })}
+                        })
+                }
             } else {
                 ""
-            },
-            
+            }
+        
         }
     }
 }

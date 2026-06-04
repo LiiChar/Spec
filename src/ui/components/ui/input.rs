@@ -82,13 +82,11 @@ pub fn Input(props: InputProps) -> Element {
     };
 
     rsx! {
-        div {
-            class: "relative flex items-center w-full",
+        div { class: "relative flex items-center w-full",
 
             // left icon
             if let Some(icon) = props.left_icon.clone() {
-                div {
-                    class: "absolute left-3 flex items-center pointer-events-none",
+                div { class: "absolute left-3 flex items-center pointer-events-none",
                     {icon}
                 }
             }
@@ -117,20 +115,14 @@ pub fn Input(props: InputProps) -> Element {
                         handler.call(evt);
                     }
                 },
-
                 ..props.attributes,
             }
 
             // right icon / loader
             if props.loading {
-                div {
-                    class: "absolute right-3 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
-                }
+                div { class: "absolute right-3 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" }
             } else if let Some(icon) = props.right_icon.clone() {
-                div {
-                    class: "absolute right-3 flex items-center",
-                    {icon}
-                }
+                div { class: "absolute right-3 flex items-center", {icon} }
             }
         }
     }

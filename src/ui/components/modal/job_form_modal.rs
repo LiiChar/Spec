@@ -36,9 +36,7 @@ pub fn JobFormModal(props: JobFormModalProps) -> Element {
                             props.on_cancel.call(());
                         },
                         class: "absolute top-3 right-2 hover:bg-destructive rounded-full p-1 transition-colors",
-                        Icon {
-                            icon: LdX
-                        }
+                        Icon { icon: LdX }
                     }
                     JobForm {
                         day,

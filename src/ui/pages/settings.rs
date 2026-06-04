@@ -102,7 +102,7 @@ pub fn SettingsPage() -> Element {
                                 }
                             }
                         }
-                        
+                    
                     }
 
                     label { class: "flex flex-col gap-2 text-sm text-foreground/70",
@@ -128,7 +128,8 @@ pub fn SettingsPage() -> Element {
 
                     SettingsSwitch {
                         title: "Компактная таймлиния".to_string(),
-                        hint: "Уплотняет отображение коротких событий.".to_string(),
+                        hint: "Уплотняет отображение коротких событий."
+                            .to_string(),
                         checked: settings.compact_timeline,
                         onclick: {
                             let st = settings_rc.clone();
@@ -156,7 +157,8 @@ pub fn SettingsPage() -> Element {
 
                     SettingsSwitch {
                         title: "Автостарт трекинга".to_string(),
-                        hint: "Флаг для запуска трекера вместе с приложением.".to_string(),
+                        hint: "Флаг для запуска трекера вместе с приложением."
+                            .to_string(),
                         checked: settings.auto_start_tracking,
                         onclick: {
                             let st = settings_rc.clone();
@@ -171,13 +173,17 @@ pub fn SettingsPage() -> Element {
             }
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
-                div {
-                    class: "flex items-center justify-between mb-4",
-                    h2 { class: " text-base font-semibold text-foreground", "Уведомления и сбор данных" }
+                div { class: "flex items-center justify-between mb-4",
+                    h2 { class: " text-base font-semibold text-foreground",
+                        "Уведомления и сбор данных"
+                    }
                     Button {
                         class: "py-1!",
                         onclick: move |_| {
-                            info(("Тест".to_string(), Some("Тестовое описание".to_string())))
+                            info((
+                                "Тест".to_string(),
+                                Some("Тестовое описание".to_string()),
+                            ))
                         },
                         "Уведомление"
                     }
@@ -186,7 +192,8 @@ pub fn SettingsPage() -> Element {
                 div { class: "grid gap-4 md:grid-cols-2",
                     SettingsSwitch {
                         title: "Уведомления".to_string(),
-                        hint: "Разрешить отложенную отправку уведомлений.".to_string(),
+                        hint: "Разрешить отложенную отправку уведомлений."
+                            .to_string(),
                         checked: settings.enable_notifications,
                         onclick: {
                             let st = settings_rc.clone();
@@ -200,7 +207,8 @@ pub fn SettingsPage() -> Element {
 
                     SettingsSwitch {
                         title: "База данных".to_string(),
-                        hint: "Сохранять данные о статистике в базу данных.".to_string(),
+                        hint: "Сохранять данные о статистике в базу данных."
+                            .to_string(),
                         checked: settings.save_data,
                         onclick: {
                             let st = settings_rc.clone();
@@ -275,12 +283,9 @@ pub fn SettingsPage() -> Element {
             }
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
-                 div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",
-                    div {
-                        class: "flex justify-between items-center gap-3 w-full",
-                        h2 { 
-                            class: "text-base font-semibold text-foreground", "Приложения" 
-                        }
+                div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",
+                    div { class: "flex justify-between items-center gap-3 w-full",
+                        h2 { class: "text-base font-semibold text-foreground", "Приложения" }
                         div {
                             Button {
                                 class: "py-1!",
@@ -289,52 +294,60 @@ pub fn SettingsPage() -> Element {
                                         let title = group.title.to_string();
                                         let tags: Vec<TagModel> = group.tags.iter().cloned().collect();
                                         let inserted = with_database_mut(|db| db.merge_tags(&tags)).unwrap_or(0);
-                                        info((format!("«{title}»: добавлено тегов: {inserted}."), None));
+                                        info((
+                                            format!("«{title}»: добавлено тегов: {inserted}."),
+                                            None,
+                                        ));
                                     }
                                 },
                                 "Загрузить шаблоны тегов"
                             }
                         }
                     }
-                }   
-                div { 
-                    class: "flex flex-wrap gap-2 max-h-96 overflow-y-auto" ,
-                    Windows { }
                 }
-             }
+                div { class: "flex flex-wrap gap-2 max-h-96 overflow-y-auto", Windows {} }
+            }
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",
                     div {
-                        h2 { class: "text-base font-semibold text-foreground", "Импорт и экспорт" }
-                        p { class: "mt-1 text-xs text-foreground/55", "Формат файла: JSON с полями events, jobs и goals." }
+                        h2 { class: "text-base font-semibold text-foreground",
+                            "Импорт и экспорт"
+                        }
+                        p { class: "mt-1 text-xs text-foreground/55",
+                            "Формат файла: JSON с полями events, jobs и goals."
+                        }
                     }
 
                     div { class: "flex flex-wrap gap-2",
                         button {
                             class: "rounded-md border border-border/40 bg-background px-3 py-2 text-sm text-foreground hover:bg-foreground/5 disabled:opacity-50",
                             disabled: is_busy(),
-                                onclick: move |_| {
-                                    if let Some(path) = pick_export_file() {
-                                        selected_export_file.set(path.display().to_string());
-                                        is_busy.set(true);
-                                        info(("Готовлю экспорт...".to_string(), None));
+                            onclick: move |_| {
+                                if let Some(path) = pick_export_file() {
+                                    selected_export_file.set(path.display().to_string());
+                                    is_busy.set(true);
+                                    info(("Готовлю экспорт...".to_string(), None));
 
-                                        match export_data_to_json().and_then(|json| {
+                                    match export_data_to_json()
+                                        .and_then(|json| {
                                             fs::write(&path, json).map_err(|err| err.to_string())
-                                        }) {
-                                            Ok(_) => {
-                                                selected_export_file.set(path.display().to_string());
-                                                info((format!("Экспорт сохранен: {}", path.display()), None));
-                                            }
-                                            Err(err) => {
-                                                info((format!("Ошибка экспорта: {err}"), None));
-                                            }
+                                        })
+                                    {
+                                        Ok(_) => {
+                                            selected_export_file.set(path.display().to_string());
+                                            info((
+                                                format!("Экспорт сохранен: {}", path.display()),
+                                                None,
+                                            ));
                                         }
-
-                                        is_busy.set(false);
+                                        Err(err) => {
+                                            info((format!("Ошибка экспорта: {err}"), None));
+                                        }
                                     }
-                                },
+                                    is_busy.set(false);
+                                }
+                            },
                             "Экспорт в файл"
                         }
 
@@ -354,20 +367,24 @@ pub fn SettingsPage() -> Element {
 
                                     match res {
                                         Ok((event_count, job_count, goal_count)) => {
-                                            let refreshed_events = with_database(|db| db.get_all_events()).unwrap_or_default();
-                                            let refreshed_jobs = with_database(|db| db.get_jobs()).unwrap_or_default();
-
+                                            let refreshed_events = with_database(|db| db.get_all_events())
+                                                .unwrap_or_default();
+                                            let refreshed_jobs = with_database(|db| db.get_jobs())
+                                                .unwrap_or_default();
                                             app.events.set(refreshed_events);
                                             app.jobs.set(refreshed_jobs);
-
                                             selected_import_file.set(path.display().to_string());
-                                            info((format!("Импортировано: events {event_count}, jobs {job_count}, goals {goal_count}."), None));
+                                            info((
+                                                format!(
+                                                    "Импортировано: events {event_count}, jobs {job_count}, goals {goal_count}.",
+                                                ),
+                                                None,
+                                            ));
                                         }
                                         Err(err) => {
                                             info((format!("Ошибка импорта: {err}"), None));
                                         }
                                     }
-
                                     is_busy.set(false);
                                 }
                             },

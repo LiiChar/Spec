@@ -1,4 +1,6 @@
 use dioxus::{desktop::tao::{event_loop::EventLoop, window::Window}, prelude::*};
+use serde_json::json;
+use uuid::Uuid;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::time::{sleep, Duration};
 
@@ -32,125 +34,11 @@ pub struct TooltipProps {
     pub gap: u64,
 }
 
-/* =========================
-   helpers (NEW LOGIC)
-========================= */
-
-#[derive(Clone, Copy)]
-struct Rect {
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
-}
-
-fn viewport_size() -> (f64, f64) {
-    let mut event_loop = EventLoop::new();
-    let window = Window::new(&event_loop).unwrap();
-
-    let size = window.inner_size();
-
-    (size.width as f64, size.height as f64)
-}
-
-fn apply_offset(x: f64, y: f64, align: TooltipAlign, gap: f64) -> (f64, f64) {
-    match align {
-        TooltipAlign::Top => (x, y - gap),
-        TooltipAlign::Bottom => (x, y + gap),
-        TooltipAlign::Left => (x - gap, y),
-        TooltipAlign::Right => (x + gap, y),
-        TooltipAlign::Center => (x, y),
-    }
-}
-
-fn flip(
-    mut x: f64,
-    mut y: f64,
-    align: TooltipAlign,
-    tooltip: Rect,
-    vw: f64,
-    vh: f64,
-    gap: f64,
-) -> (f64, f64, TooltipAlign) {
-    let mut new_align = align;
-
-    let fits_right = x + tooltip.w < vw;
-    let fits_left = x - tooltip.w > 0.0;
-    let fits_top = y - tooltip.h > 0.0;
-    let fits_bottom = y + tooltip.h < vh;
-
-    match align {
-        TooltipAlign::Right if !fits_right && fits_left => {
-            new_align = TooltipAlign::Left;
-            x -= tooltip.w + gap;
-        }
-        TooltipAlign::Left if !fits_left && fits_right => {
-            new_align = TooltipAlign::Right;
-            x += gap;
-        }
-        TooltipAlign::Top if !fits_top && fits_bottom => {
-            new_align = TooltipAlign::Bottom;
-            y += gap;
-        }
-        TooltipAlign::Bottom if !fits_bottom && fits_top => {
-            new_align = TooltipAlign::Top;
-            y -= tooltip.h + gap;
-        }
-        _ => {}
-    }
-
-    (x, y, new_align)
-}
-
-fn shift(mut x: f64, mut y: f64, tooltip: Rect, vw: f64, vh: f64) -> (f64, f64) {
-    if x + tooltip.w > vw {
-        x = vw - tooltip.w - 8.0;
-    }
-    if x < 0.0 {
-        x = 8.0;
-    }
-
-    if y + tooltip.h > vh {
-        y = vh - tooltip.h - 8.0;
-    }
-    if y < 0.0 {
-        y = 8.0;
-    }
-
-    (x, y)
-}
-
-fn compute_position(
-    x: f64,
-    y: f64,
-    align: TooltipAlign,
-    gap: f64,
-) -> (f64, f64, TooltipAlign) {
-    let (vw, vh) = viewport_size();
-
-    // примерные размеры tooltip (можно улучшить через измерение DOM)
-    let tooltip = Rect {
-        x: 0.0,
-        y: 0.0,
-        w: 180.0,
-        h: 32.0,
-    };
-
-    let (mut x, mut y) = apply_offset(x, y, align, gap as f64);
-    let (x2, y2, align2) = flip(x, y, align, tooltip, vw, vh, gap as f64);
-    let (x3, y3) = shift(x2, y2, tooltip, vw, vh);
-
-    (x3, y3, align2)
-}
-
-/* =========================
-   COMPONENT
-========================= */
-
 #[component]
 pub fn Tooltip(props: TooltipProps) -> Element {
     let mut visible = use_signal(|| false);
     let mut position = use_signal(|| [0.0, 0.0]);
+    let id: Signal<String> = use_signal(|| Uuid::new_v4().to_string());
 
     let position_class = match props.at_cursor {
         false => match props.align {
@@ -173,11 +61,61 @@ pub fn Tooltip(props: TooltipProps) -> Element {
         div {
             class: "relative w-full h-full {props.class}",
 
-            onmouseenter: move |_| {
+            onmouseenter: move |evt| async move  {
                 spawn(async move {
                     sleep(TOOLTIP_HIDE_DELAY).await;
                     visible.set(true);
                 });
+                if props.at_cursor {
+                    evt.stop_propagation();
+                    
+                    let tooltip_width = document::eval(
+                            format!(
+                                r#"const el=document.querySelector('.tooltip[id="{}"]');
+                                return el ? el.offsetWidth : 300;"#,
+                                id()
+                            ).as_str()
+                        )
+                        .await
+                        .unwrap_or(json!(300))
+                        .as_f64()
+                        .unwrap_or(300.0);
+
+                    let tooltip_height = document::eval(
+                            format!(
+                                r#"const el=document.querySelector('.tooltip[id="{}"]');
+                                return el ? el.offsetHeight : 120;"#,
+                                id()
+                            ).as_str()
+                        )
+                        .await
+                        .unwrap_or(json!(120))
+                        .as_f64()
+                        .unwrap_or(120.0);
+
+                    const BORDER_GAP: f64 = 4.0;
+                    const BORDER_RIGHT_GAP: f64 = 14.0;
+                    
+                    let evt_x: f64 = evt.client_coordinates().x;
+                    let evt_y: f64 = evt.client_coordinates().y;
+                    
+                    let client_w = document::eval("return window.innerWidth").await.unwrap_or(json!(0)).as_f64().unwrap_or(800.0);
+                    let client_h = document::eval("return window.innerHeight").await.unwrap_or(json!(0)).as_f64().unwrap_or(600.0); 
+
+                    let half_w = tooltip_width / 2.0;
+                    let half_h = tooltip_height / 2.0;
+
+
+                    let x = (evt_x)
+                        .max(half_w + BORDER_GAP)
+                        .min(client_w - half_w - BORDER_RIGHT_GAP);
+
+                    let y = (evt_y)
+                        .max(half_h + BORDER_GAP)
+                        .min(client_h - half_h - BORDER_GAP);
+
+                    position.set([x, y]);
+                };
             },
 
             onmouseleave: move |_| {
@@ -201,22 +139,57 @@ pub fn Tooltip(props: TooltipProps) -> Element {
                 });
             },
 
-            onmousemove: move |evt| {
+            onmousemove: move |evt: Event<MouseData>| async move {
                 if props.at_cursor {
                     evt.stop_propagation();
+                    
+                    let tooltip_width = document::eval(
+                            format!(
+                                r#"const el=document.querySelector('.tooltip[id="{}"]');
+                                return el ? el.offsetWidth : 300;"#,
+                                id()
+                            ).as_str()
+                        )
+                        .await
+                        .unwrap_or(json!(300))
+                        .as_f64()
+                        .unwrap_or(300.0);
 
-                    let x: f64 = evt.client_coordinates().x;
-                    let y: f64 = evt.client_coordinates().y;
+                    let tooltip_height = document::eval(
+                            format!(
+                                r#"const el=document.querySelector('.tooltip[id="{}"]');
+                                return el ? el.offsetHeight : 120;"#,
+                                id()
+                            ).as_str()
+                        )
+                        .await
+                        .unwrap_or(json!(120))
+                        .as_f64()
+                        .unwrap_or(120.0);
 
-                    // let (nx, ny, _) = compute_position(
-                    //     x,
-                    //     y,
-                    //     props.align,
-                    //     props.gap as f64,
-                    // );
+                    const BORDER_GAP: f64 = 4.0;
+                    const BORDER_RIGHT_GAP: f64 = 14.0;
+                    
+                    let evt_x: f64 = evt.client_coordinates().x;
+                    let evt_y: f64 = evt.client_coordinates().y;
+                    
+                    let client_w = document::eval("return window.innerWidth").await.unwrap_or(json!(0)).as_f64().unwrap_or(800.0);
+                    let client_h = document::eval("return window.innerHeight").await.unwrap_or(json!(0)).as_f64().unwrap_or(600.0); 
+
+                    let half_w = tooltip_width / 2.0;
+                    let half_h = tooltip_height / 2.0;
+
+
+                    let x = (evt_x)
+                        .max(half_w + BORDER_GAP)
+                        .min(client_w - half_w - BORDER_RIGHT_GAP);
+
+                    let y = (evt_y)
+                        .max(half_h + BORDER_GAP)
+                        .min(client_h - half_h - BORDER_GAP);
 
                     position.set([x, y]);
-                }
+                };
             },
 
             {props.children}
@@ -224,23 +197,24 @@ pub fn Tooltip(props: TooltipProps) -> Element {
             if visible() || props.visible {
                 div {
                     role: "tooltip",
-                    class: "absolute pointer-events-none whitespace-nowrap rounded-md border border-border/40 bg-secondary/70 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class}",
+                    id: id(),
+                    class: "absolute pointer-events-none whitespace-nowrap tooltip rounded-md border border-border/40 bg-secondary/70 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class}",
 
                     style: match props.at_cursor {
-                        true => format!(
-                            "position: fixed; left: {}px; top: {}px; z-index: 2147483647;",
-                            position()[0],
-                            position()[1]
-                        ),
+                        true => {
+                            format!(
+                                "position: fixed; left: {}px; top: {}px; z-index: 2147483647;",
+                                position()[0],
+                                position()[1],
+                            )
+                        }
                         false => "z-index: 2147483647;".to_string(),
                     },
 
                     {
                         match props.target.clone() {
                             Some(target) => target,
-                            None => rsx! {
-                                "{props.text}"
-                            },
+                            None => rsx! { "{props.text}" },
                         }
                     }
                 }

@@ -128,14 +128,11 @@ pub fn Button(props: ButtonProps) -> Element {
                     handler.call(evt);
                 }
             },
-
             ..props.attributes,
 
             // loader
             if props.loading {
-                span {
-                    class: "absolute w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
-                }
+                span { class: "absolute w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" }
             }
 
             {props.children}

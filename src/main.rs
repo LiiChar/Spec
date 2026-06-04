@@ -23,26 +23,60 @@ static DB: Lazy<Db> = Lazy::new(|| Arc::new(Mutex::new(Database::new(DATABASE_PA
 const DB_BATCH_SIZE: usize = 64;
 const TRAY_ICON: Asset = asset!("/assets/tray_icon.png");
 
-fn main() {
-    dioxus::logger::init(Level::INFO).unwrap();
-    let settings = load_settings();
+#[derive(Debug, Clone)]
+struct AppArgs {
+    autostart: bool,
+    hidden: bool,
+}
 
-    if settings.auto_start_tracking {
-        let builder = Builder::new();
-        let autolaunch = builder.build().unwrap();
-        autolaunch.enable().unwrap();
+fn parse_args() -> AppArgs {
+    let mut args = AppArgs {
+        autostart: false,
+        hidden: false,
+    };
+
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--autostart" => args.autostart = true,
+            "--hidden" => args.hidden = true,
+            _ => {}
+        }
     }
 
-    let icon = load_icon(&Path::new(TRAY_ICON.bundled().absolute_source_path()));
+    args
+}
 
-    let window_config = WindowBuilder::new().with_decorations(false).with_window_icon(Some(icon));
-    DB.lock().unwrap();
+fn main() {
+    let args = parse_args();
+    let exe = std::env::current_exe().unwrap();
+
+    if let Some(dir) = exe.parent() {
+        std::env::set_current_dir(dir).ok();
+    }
+
+    dioxus::logger::init(Level::INFO).unwrap();
+
+    let settings = load_settings();
+
+    let icon = load_icon(&Path::new(TRAY_ICON.bundled().absolute_source_path()));
+    let window_config = WindowBuilder::new().with_decorations(false).with_window_icon(Some(icon)).with_visible(!args.hidden);
+
+    if cfg!(debug_assertions) {
+        println!("Debug starting application with args: {:?}", args);
+    } else {
+        if settings.auto_start_tracking {
+            let builder = Builder::new().app_name("Spec").arg("--autostart").arg("--hidden");
+            let autolaunch = builder.build().unwrap();
+            autolaunch.enable().unwrap();
+        }
+    }
 
     let (tx_forward, rx_forward) = crossbeam_channel::unbounded::<EventModel>();
     let (tx_db, rx_db) = crossbeam_channel::unbounded::<EventModel>();
     let (tx_ui, rx_ui) = crossbeam_channel::unbounded::<EventModel>();
 
     {
+        DB.lock().unwrap();
         *RX.lock().unwrap() = Some(rx_ui);
     }
 
@@ -127,12 +161,12 @@ fn main() {
         }
     });
 
-    // отправка событий в обработчик
+    // запуск трекинга и отправка событий в обработчики
     thread::spawn(move || {
         core::tracker::start_tracking(tx_forward);
     });
     
-
+    // запуск ui части
     dioxus::LaunchBuilder::desktop()
         .with_cfg(Config::new().with_window(window_config))
         .launch(Root);

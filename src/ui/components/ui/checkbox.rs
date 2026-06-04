@@ -8,14 +8,14 @@ pub fn Checkbox(
     rsx! {
         input {
             r#type: "checkbox",
-            checked: checked,
+            checked,
             class: "w-4 h-4 accent-primary cursor-pointer",
 
             onchange: move |e| {
                 if let Some(handler) = &onchange {
                     handler.call(e);
                 }
-            }
+            },
         }
     }
 }

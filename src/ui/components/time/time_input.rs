@@ -51,8 +51,7 @@ pub fn TimeInput(props: TimeInputProps) -> Element {
     };
 
     rsx! {
-        div {
-            class: "flex justofy-center gap-0.5",
+        div { class: "flex justofy-center gap-0.5 h-full w-full",
 
             // HOURS
             input {
@@ -71,13 +70,11 @@ pub fn TimeInput(props: TimeInputProps) -> Element {
                     }
                 },
             }
-            span {
-              ":"
-             }
+            span { ":" }
             // MINUTES
             input {
-              class: "w-[calc(100%/3-6px)] text-center",
-              r#type: "number",
+                class: "w-[calc(100%/3-6px)] text-center",
+                r#type: "number",
                 value: if minutes > 9 { format!("{minutes}") } else { format!("0{minutes}") },
                 oninput: move |evt| {
                     if let Ok(m) = evt.value().parse::<i32>() {
@@ -89,12 +86,10 @@ pub fn TimeInput(props: TimeInputProps) -> Element {
                     }
                 },
             }
-            span {
-              ":"
-             }
+            span { ":" }
             // SECONDS
             input {
-              class: "w-[calc(100%/3-6px)] text-center",
+                class: "w-[calc(100%/3-6px)] text-center",
                 r#type: "number",
                 value: if seconds > 9 { format!("{seconds}") } else { format!("0{seconds}") },
                 oninput: move |evt| {

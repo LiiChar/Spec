@@ -132,10 +132,10 @@ pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
 }
 
 fn get_browser_info() -> Result<(String, String), String> {
-    if is_browser_active() {
+    if false && is_browser_active() {
         match get_active_browser_url() {
-            Ok(browser) => Ok((browser.url, browser.browser_name)),
-            Err(_) => Err("Failed get browser info".to_string()),
+            Ok(info) => Ok((info.url, info.browser_name)), 
+            Err(_) => Err("Failed get browser info".to_string())
         } 
     } else {
         Err("No browser active".to_string())

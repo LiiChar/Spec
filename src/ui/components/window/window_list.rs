@@ -10,18 +10,18 @@ pub struct WindowListProps {
 #[component]
 pub fn WindowList(props: WindowListProps) -> Element {
   rsx! {
-    div {
-      class: "flex flex-col gap-1 w-full h-full",
-      
-      {
-        props.windows.iter().map(|(window, tags)| {
-          rsx! {
-            WindowItem {
-              window: (window.clone(), tags.clone())
-            }
-          }
-        })
-      }
+    div { class: "flex flex-col gap-1 w-full h-full",
+
+        {
+            props
+                .windows
+                .iter()
+                .map(|(window, tags)| {
+                    rsx! {
+                        WindowItem { window: (window.clone(), tags.clone()) }
+                    }
+                })
+        }
     }
-  }
+}
 }

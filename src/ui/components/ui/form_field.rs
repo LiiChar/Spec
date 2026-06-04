@@ -13,8 +13,7 @@ pub struct FormFieldProps {
 #[component]
 pub fn FormField(props: FormFieldProps) -> Element {
     rsx! {
-        div {
-            class: "flex flex-col gap-1 w-full",
+        div { class: "flex flex-col gap-1 w-full",
 
             if let Some(label) = props.label {
                 Label { "{label}" }

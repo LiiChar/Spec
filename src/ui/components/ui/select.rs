@@ -28,8 +28,8 @@ pub fn Select(
         cb: onchange
     });
 
-    rsx! { 
-        div { 
+    rsx! {
+        div {
             class: "relative group outline-none border-none",
             role: "button",
             tabindex: "0",
@@ -44,7 +44,7 @@ pub fn Select(
                 }
             },
             {children}
-        } 
+        }
     }
 }
 
@@ -61,11 +61,16 @@ pub fn SelectTrigger(props: SelectTriggerProps) -> Element {
     
     rsx! {
         div {
-            class: format!("relative rounded-md border border-border/40 bg-background px-3 py-2 text-foreground group-focus:border-primary outline-none shadow select-none pr-10 {}", props.class),
+            class: format!(
+                "relative rounded-md border border-border/40 bg-background px-3 py-2 text-foreground group-focus:border-primary outline-none shadow select-none pr-10 {}",
+                props.class,
+            ),
             onclick: move |_| ctx.open.set(!is_open),
-            div {
-                class: "absolute right-2 top-1/2 -translate-y-1/2 text-xs",
-                Icon { icon: LdChevronUp, class: format!("transition-all {}", if is_open { "rotate-180" } else { "" }) }
+            div { class: "absolute right-2 top-1/2 -translate-y-1/2 text-xs",
+                Icon {
+                    icon: LdChevronUp,
+                    class: format!("transition-all {}", if is_open { "rotate-180" } else { "" }),
+                }
             }
             "{ctx.title}"
         }
@@ -86,12 +91,13 @@ pub fn SelectContent(props: SelectContentProps) -> Element {
     rsx! {
         div {
             class: "absolute z-1 mt-1 w-full rounded-md border border-border/40 bg-background  text-foreground outline-none focus:border-primary shadow select-none {props.class}",
-            style: format!("{}", 
+            style: format!(
+                "{}",
                 if ctx.open.read().clone() {
                     "max-height: inherit; overflow: auto; margin-top: 2px; opacity: 1;"
                 } else {
                     "max-height: 0; overflow: hidden; margin-top: 0; opacity: 0;"
-                }
+                },
             ),
             {props.children}
         }
@@ -131,13 +137,14 @@ pub fn SelectItem(props: SelectItemProps) -> Element {
 
     rsx! {
         div {
-            class: format!("px-3 py-2 hover:bg-foreground/5 cursor-pointer {} {}",
+            class: format!(
+                "px-3 py-2 hover:bg-foreground/5 cursor-pointer {} {}",
                 if ctx.value.read().clone() == props.value.clone() {
                     "text-primary"
                 } else {
                     ""
                 },
-                props.class
+                props.class,
             ),
             onclick: move |_| {
                 let t = title.clone();

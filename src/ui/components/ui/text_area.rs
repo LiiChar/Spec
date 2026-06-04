@@ -20,7 +20,7 @@ pub fn Textarea(
                 if let Some(handler) = &oninput {
                     handler.call(e);
                 }
-            }
+            },
         }
     }
 }

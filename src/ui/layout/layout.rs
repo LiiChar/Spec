@@ -11,15 +11,11 @@ pub fn Layout(children: Element) -> Element {
     };
 
     rsx! {
-        div {
-            class: "flex flex-col w-full h-full bg-background",
+        div { class: "flex flex-col w-full h-full bg-background",
 
             Header {}
 
-            main {
-                class: "mt-4 flex-1 {theme_class} p-2",
-                {children}
-            }
+            main { class: "mt-4 flex-1 {theme_class} p-2", {children} }
 
             Toaster {}
             Alerter {}

@@ -11,7 +11,10 @@ pub fn Dropdown(children: Element) -> Element {
 
     use_context_provider(|| DropdownContext { open });
 
-    rsx! { div { class: "relative inline-block", {children} } }
+    rsx! {
+        div { class: "relative inline-block", {children} }
+
+    }
 }
 
 #[component]
@@ -20,11 +23,7 @@ pub fn DropdownTrigger(children: Element) -> Element {
     let mut is_open = ctx.open.clone();
     let open = ctx.open.read().clone();
     rsx! {
-        div {
-            onclick: move |_| is_open.set(!open),
-            class: "cursor-pointer",
-            {children}
-        }
+        div { onclick: move |_| is_open.set(!open), class: "cursor-pointer", {children} }
     }
 }
 
@@ -37,8 +36,7 @@ pub fn DropdownContent(children: Element) -> Element {
     }
 
     rsx! {
-        div {
-            class: "
+        div { class: "
                 absolute mt-2 w-48 bg-background border border-border/40
                 rounded-md shadow-md p-1 z-50
             ",

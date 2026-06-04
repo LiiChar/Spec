@@ -433,7 +433,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                                 style: format!("min-width: 220px; border-left: 1px solid {};", color),
 
                                                 div {
-                                                    class: "flex gap-2 items-center",
+                                                    class: "flex gap-2 items-center overflow-hidden text-ellipsis",
                                                     if let Some(window) = event.window.clone() {
                                                         if let Some(icon) = window.icon_base64 {
                                                             img {

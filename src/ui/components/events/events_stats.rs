@@ -107,68 +107,72 @@ pub fn EventsStats() -> Element {
         .unwrap_or_default();
 
     rsx! {
-        div {
-            class: "flex flex-col gap-3 rounded-md",
-            div {
-                class: "rounded-md shadow-sm p-3  border border-border/30",
+        div { class: "flex flex-col gap-3 rounded-md",
+            div { class: "rounded-md shadow-sm p-3  border border-border/30",
                 h3 { class: "text-lg font-semibold mb-3 flex flex-col",
-                    span {
-                        "Статистика"
-                    }
-                    span {
-                        class: "text-xs text-muted-foreground",
-                        "{fmt_start_date} - {fmt_end_date}"
-                    }
+                    span { "Статистика" }
+                    span { class: "text-xs text-muted-foreground", "{fmt_start_date} - {fmt_end_date}" }
                 }
                 div { class: "grid grid-cols-2 gap-3",
-                    div {
-                        class: "text-xs text-muted-foreground", "Общее время"
-                        div { class: "text-base font-semibold text-foreground", "{format_time(total_time)}" }
+                    div { class: "text-xs text-muted-foreground",
+                        "Общее время"
+                        div { class: "text-base font-semibold text-foreground",
+                            "{format_time(total_time)}"
+                        }
                     }
-                    div {
-                        class: "text-xs text-muted-foreground", "Активное время"
-                        div { class: "text-base font-semibold text-primary", "{format_time(active_time)}" }
+                    div { class: "text-xs text-muted-foreground",
+                        "Активное время"
+                        div { class: "text-base font-semibold text-primary",
+                            "{format_time(active_time)}"
+                        }
                     }
-                    div {
-                        class: "text-xs text-muted-foreground", "Бездействие"
-                        div { class: "text-base font-semibold text-foreground", "{format_time(idle_time)}" }
+                    div { class: "text-xs text-muted-foreground",
+                        "Бездействие"
+                        div { class: "text-base font-semibold text-foreground",
+                            "{format_time(idle_time)}"
+                        }
                     }
-                    div {
-                        class: "text-xs text-muted-foreground", "Количество событий"
+                    div { class: "text-xs text-muted-foreground",
+                        "Количество событий"
                         div { class: "text-base font-semibold text-foreground", "{num_events}" }
                     }
-                    div {
-                        class: "text-xs text-muted-foreground", "Средняя продолжительность"
-                        div { class: "text-base font-semibold text-foreground", "{format_time(avg_event_duration)}" }
+                    div { class: "text-xs text-muted-foreground",
+                        "Средняя продолжительность"
+                        div { class: "text-base font-semibold text-foreground",
+                            "{format_time(avg_event_duration)}"
+                        }
                     }
                     if let Some((app, active, idle, icon)) = most_used_app {
-                        div {
-                            class: "text-xs text-muted-foreground", "Самое используемое"
-                            div { class: "text-base font-semibold text-foreground", "{app}" }
-                            div { class: "text-xs text-muted-foreground", "Актив: {format_time(active)}, Idle: {format_time(idle)}" }
+                        div { class: "text-xs text-muted-foreground",
+                            "Самое используемое"
+                            div { class: "text-base font-semibold text-foreground",
+                                "{app}"
+                            }
+                            div { class: "text-xs text-muted-foreground",
+                                "Актив: {format_time(active)}, Idle: {format_time(idle)}"
+                            }
                         }
                     }
                 }
             }
-            div {
-                class: "rounded-md shadow-sm p-3  border border-border/30",
+            div { class: "rounded-md shadow-sm p-3  border border-border/30",
                 h3 { class: "text-sm font-semibold mb-3", "Приложения ({num_apps})" }
                 div { class: "flex flex-col gap-1",
                     for (app, active, idle, icon) in app_list {
                         div { class: "flex justify-between items-center p-1.5 rounded hover:bg-secondary/30 transition-colors",
-                            div {
-                                class: "flex gap-2 items-center",
+                            div { class: "flex gap-2 items-center",
                                 if let Some(icon) = icon {
-                                    img {
-                                        class: "w-5 h-5 rounded",
-                                        src: icon
-                                    }
+                                    img { class: "w-5 h-5 rounded", src: icon }
                                 }
-                                span { class: "text-xs font-medium text-foreground truncate max-w-[150px]", "{app}" }
+                                span { class: "text-xs font-medium text-foreground truncate max-w-[150px]",
+                                    "{app}"
+                                }
                             }
                             div { class: "flex flex-col text-end",
                                 span { class: "text-xs text-foreground", "{format_time(active)}" }
-                                span { class: "text-[10px] text-muted-foreground", "{format_time(idle)} idle" }
+                                span { class: "text-[10px] text-muted-foreground",
+                                    "{format_time(idle)} idle"
+                                }
                             }
                         }
                     }

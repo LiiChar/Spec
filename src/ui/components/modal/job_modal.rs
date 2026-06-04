@@ -48,7 +48,7 @@ pub fn JobModal(props: JobModalProps) -> Element {
 
     let job: JobModel = match op_job.clone() {
         Some(j) => j,
-        None => return rsx! {""},
+        None => return rsx! { "" },
     };
 
     let delete = Callback::new(move |_: ()| {
@@ -91,121 +91,82 @@ pub fn JobModal(props: JobModalProps) -> Element {
                         props.on_close.call(());
                     },
                     class: "absolute top-1.5 right-0.5 hover:bg-destructive rounded-lg p-1 transition-colors",
-                    Icon {
-                        icon: LdX
-                    }
+                    Icon { icon: LdX }
                 }
                 div {
-                   if !visible_update(){
-                    
-                     div {
+                    if !visible_update() {
+
                         div {
-                            class: "flex items-center gap-2 mb-1 justify-between border-b border-border/40 pb-1",
-                            h2 {
-                                class: " text-xl",
-                                "{job.name}"
+                            div { class: "flex items-center gap-2 mb-1 justify-between border-b border-border/40 pb-1",
+                                h2 { class: " text-xl", "{job.name}" }
+                                div { class: "text-xs text-muted-foreground/60 flex gap-2 items-center",
+                                    span { "{formatted_start_job}" }
+                                    span { "-" }
+                                    span { "{formatted_end_job}" }
+                                }
                             }
-                            div {
-                                class: "text-xs text-muted-foreground/60 flex gap-2 items-center",
-                                span {
-                                    "{formatted_start_job}"
+                            if let Some(desc) = &job.description {
+                                p { class: "text-xs text-muted-foreground/60 mt-2",
+                                    "Описание"
                                 }
-                                span {
-                                    "-"
-                                }
-                                span {
-                                    "{formatted_end_job}"
-                                }
-                            }   
-                        }
-                        if let Some(desc) = &job.description {
-                            p { 
-                                class: "text-xs text-muted-foreground/60 mt-2",
-                                "Описание"
-                             }
-                            p {
-                                class: "-mt-1",
-                                "{desc}"
+                                p { class: "-mt-1", "{desc}" }
                             }
-                        }
-                        div {
-                            class: "mt-4",
+                            div { class: "mt-4",
 
-                            {
-                                let s = stats();
-                                let format_active_percent = format!("{:.1}%", s.active_percent);
-                                let format_idle_percent = format!("{:.1}%", s.idle_percent);
+                                {
+                                    let s = stats();
+                                    let format_active_percent = format!("{:.1}%", s.active_percent);
+                                    let format_idle_percent = format!("{:.1}%", s.idle_percent);
 
-                                rsx! {
-                                    div {
-                                        class: "",
+                                    rsx! {
+                                        div { class: "",
 
-                                        div {
-                                            class: "grid grid-cols-2 gap-2 text-sm",
+                                            div { class: "grid grid-cols-2 gap-2 text-sm",
 
-                                            div {
-                                                class: "rounded-md border border-border/40 p-2",
-                                                div { class: "text-xs opacity-70", "Общее время" }
-                                                div { class: "font-medium", "{format_duration_short(s.total_time)}" }
-                                            }
+                                                div { class: "rounded-md border border-border/40 p-2",
+                                                    div { class: "text-xs opacity-70", "Общее время" }
+                                                    div { class: "font-medium", "{format_duration_short(s.total_time)}" }
+                                                }
 
-                                            div {
-                                                class: "rounded-md border border-border/40 p-2",
-                                                div { class: "text-xs opacity-70", "Активность" }
-                                                div {
-                                                    class: "font-medium",
-                                                    "{format_duration_short(s.active_time)} ({format_active_percent})"
+                                                div { class: "rounded-md border border-border/40 p-2",
+                                                    div { class: "text-xs opacity-70", "Активность" }
+                                                    div { class: "font-medium",
+                                                        "{format_duration_short(s.active_time)} ({format_active_percent})"
+                                                    }
+                                                }
+
+                                                div { class: "rounded-md border border-border/40 p-2",
+                                                    div { class: "text-xs opacity-70", "Простой" }
+                                                    div { class: "font-medium", "{format_duration_short(s.idle_time)} ({format_idle_percent})" }
+                                                }
+
+                                                div { class: "rounded-md border border-border/40 p-2",
+                                                    div { class: "text-xs opacity-70", "Событий" }
+                                                    div { class: "font-medium", "{s.num_events}" }
+                                                }
+
+                                                div { class: "rounded-md border border-border/40 p-2",
+                                                    div { class: "text-xs opacity-70", "Приложений" }
+                                                    div { class: "font-medium", "{s.num_apps}" }
+                                                }
+
+                                                div { class: "rounded-md border border-border/40 p-2",
+                                                    div { class: "text-xs opacity-70", "Средняя длительность" }
+                                                    div { class: "font-medium", "{format_duration_short(s.avg_event_duration)}" }
                                                 }
                                             }
 
-                                            div {
-                                                class: "rounded-md border border-border/40 p-2",
-                                                div { class: "text-xs opacity-70", "Простой" }
-                                                div {
-                                                    class: "font-medium",
-                                                    "{format_duration_short(s.idle_time)} ({format_idle_percent})"
-                                                }
-                                            }
-
-                                            div {
-                                                class: "rounded-md border border-border/40 p-2",
-                                                div { class: "text-xs opacity-70", "Событий" }
-                                                div { class: "font-medium", "{s.num_events}" }
-                                            }
-
-                                            div {
-                                                class: "rounded-md border border-border/40 p-2",
-                                                div { class: "text-xs opacity-70", "Приложений" }
-                                                div { class: "font-medium", "{s.num_apps}" }
-                                            }
-
-                                            div {
-                                                class: "rounded-md border border-border/40 p-2",
-                                                div { class: "text-xs opacity-70", "Средняя длительность" }
-                                                div { class: "font-medium", "{format_duration_short(s.avg_event_duration)}" }
-                                            }
-                                        }
-
-                                        
                                             if let Some(app) = &s.most_used_app {
                                                 {
                                                     let act_per = format!("{:.1}%", app.active_percent);
                                                     rsx! {
-                                                        div {
-                                                            class: "rounded-md border border-border/40 p-3 my-2",
+                                                        div { class: "rounded-md border border-border/40 p-3 my-2",
 
-                                                            div {
-                                                                class: "text-xs opacity-70 mb-1",
-                                                                "Самое используемое приложение"
-                                                            }
+                                                            div { class: "text-xs opacity-70 mb-1", "Самое используемое приложение" }
 
-                                                            div {
-                                                                class: "font-medium",
-                                                                "{app.name}"
-                                                            }
+                                                            div { class: "font-medium", "{app.name}" }
 
-                                                            div {
-                                                                class: "text-sm opacity-80",
+                                                            div { class: "text-sm opacity-80",
                                                                 "{format_duration_short(app.total_time)} · {act_per} активного времени"
                                                             }
                                                         }
@@ -213,88 +174,77 @@ pub fn JobModal(props: JobModalProps) -> Element {
                                                 }
                                             }
 
-                                        if !s.app_list.is_empty() {
-                                            div {
-                                                class: "flex flex-col gap-1",
-                                                for app in s.app_list.iter().take(5) {
-                                                    div {
-                                                        class: "rounded-md border border-border/40 p-2",
+                                            if !s.app_list.is_empty() {
+                                                div { class: "flex flex-col gap-1",
+                                                    for app in s.app_list.iter().take(5) {
+                                                        div { class: "rounded-md border border-border/40 p-2",
 
-                                                        div {
-                                                            class: "flex justify-between gap-2",
+                                                            div { class: "flex justify-between gap-2",
 
-                                                            div {
-                                                                class: "truncate text-sm font-medium",
-                                                                "{app.name}"
+                                                                div { class: "truncate text-sm font-medium", "{app.name}" }
+
+                                                                div { class: "text-xs opacity-70 whitespace-nowrap",
+                                                                    "{format_duration_short(app.total_time)}"
+                                                                }
                                                             }
 
-                                                            div {
-                                                                class: "text-xs opacity-70 whitespace-nowrap",
-                                                                "{format_duration_short(app.total_time)}"
-                                                            }
-                                                        }
+                                                            div { class: "mt-1 h-1.5 rounded-full bg-muted overflow-hidden",
 
-                                                        div {
-                                                            class: "mt-1 h-1.5 rounded-full bg-muted overflow-hidden",
-
-                                                            div {
-                                                                class: "h-full rounded-full bg-primary",
-                                                                style: format!("width: {:.2}%", app.active_percent)
+                                                                div {
+                                                                    class: "h-full rounded-full bg-primary",
+                                                                    style: format!("width: {:.2}%", app.active_percent),
+                                                                }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
+
                                         }
 
                                     }
 
-                                    }
                                 }
                             }
                         }
 
-                        div {
-                            class: "flex gap-1 justify-end mt-2",
+                        div { class: "flex gap-1 justify-end mt-2",
                             Button {
                                 onclick: move |_| {
                                     delete(());
                                 },
-                                Icon {
-                                    icon: LdTrash
-                                }
+                                Icon { icon: LdTrash }
                             }
                             Button {
                                 onclick: move |_| {
                                     visible_update.set(true);
                                 },
-                                Icon {
-                                    icon: LdPencil
-                                }
-                            }
-                        }
-                    }}
-                    if visible_update() {
-                        {
-                            let job = job.clone();
-                            rsx! {
-                                JobForm {
-                                    job: Some(job.clone()),
-                                    day: job_anchor_day(&job),
-                                    end_ts: job.end_ts,
-                                    start_ts: job.start_ts,
-                                    on_save: move |job: JobModel| {
-                                        update(job.clone());
-                                        visible_update.set(false);
-                                    },
-                                    on_cancel: move |_| visible_update.set(false),
-                                }
+                                Icon { icon: LdPencil }
                             }
                         }
                     }
-
                 }
-
+                if visible_update() {
+                    {
+                        let job = job.clone();
+                        rsx! {
+                            JobForm {
+                                job: Some(job.clone()),
+                                day: job_anchor_day(&job),
+                                end_ts: job.end_ts,
+                                start_ts: job.start_ts,
+                                on_save: move |job: JobModel| {
+                                    update(job.clone());
+                                    visible_update.set(false);
+                                },
+                                on_cancel: move |_| visible_update.set(false),
+                            }
+                        }
+                    }
+                }
+            
             }
+        
         }
+    }
     }

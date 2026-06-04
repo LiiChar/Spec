@@ -52,7 +52,10 @@ pub fn Tabs(props: TabsProps) -> Element {
         variant: props.variant,
     });
 
-    rsx! { div  { {props.children} } }
+    rsx! {
+        div { {props.children} }
+
+    }
 }
 
 #[component]
@@ -67,7 +70,9 @@ pub fn TabsList(props: ChildrenProps) -> Element {
     };
 
     rsx! {
-        div { class: "flex transition-all overflow-hidden w-min {props.class} {class}", {props.children} }
+        div { class: "flex transition-all overflow-hidden w-min {props.class} {class}",
+            {props.children}
+        }
     }
 }
 
@@ -84,9 +89,7 @@ pub fn TabsTrigger(props: TabsTriggerProps) -> Element {
 
     rsx! {
         button {
-            class: format!("cursor-pointer {}",
-                class
-            ),
+            class: format!("cursor-pointer {}", class),
 
             onclick: move |_| ctx.value.set(props.value.clone()),
 

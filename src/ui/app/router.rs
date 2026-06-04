@@ -15,9 +15,15 @@ pub fn Router() -> Element {
 
     rsx! {
         match *page.read() {
-            Page::Main => rsx! { MainPage {} },
-            Page::Settings => rsx! { SettingsPage {} },
-            Page::Statistics => rsx! { StatisticsPage {} },
+            Page::Main => rsx! {
+                MainPage {}
+            },
+            Page::Settings => rsx! {
+                SettingsPage {}
+            },
+            Page::Statistics => rsx! {
+                StatisticsPage {}
+            },
         }
     }
 }

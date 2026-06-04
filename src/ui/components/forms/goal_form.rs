@@ -88,9 +88,12 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
     });
 
     rsx! {
-        h2 {
-            class: "text-lg font-semibold mb-4",
-            if is_edit { "Редактирование цели" } else { "Новая цель" }
+        h2 { class: "text-lg font-semibold mb-4",
+            if is_edit {
+                "Редактирование цели"
+            } else {
+                "Новая цель"
+            }
         }
 
         div { class: "space-y-4",
@@ -109,7 +112,7 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
                     class: "w-full px-3 py-2 border rounded-md bg-background",
                     value: "{description}",
                     oninput: move |e| description.set(e.value()),
-                    placeholder: "Необязательно"
+                    placeholder: "Необязательно",
                 }
             }
 
@@ -119,7 +122,7 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
                     class: "w-full px-3 py-2 border rounded-md bg-background",
                     value: "{process}",
                     oninput: move |e| process.set(e.value()),
-                    placeholder: "chrome.exe, Code.exe..."
+                    placeholder: "chrome.exe, Code.exe...",
                 }
             }
 
@@ -138,11 +141,14 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
                     class: "h-10 rounded-md border border-border/40 bg-background px-3",
                     value: "{ordering().as_str()}",
                     onchange: move |e| {
-                        ordering.set(match e.value().as_str() {
-                            "<" => GoalOrder::Less,
-                            ">" => GoalOrder::Greater,
-                            _ => GoalOrder::Equal,
-                        });
+                        ordering
+                            .set(
+                                match e.value().as_str() {
+                                    "<" => GoalOrder::Less,
+                                    ">" => GoalOrder::Greater,
+                                    _ => GoalOrder::Equal,
+                                },
+                            );
                     },
                     option { value: "=", "Равно (=)" }
                     option { value: "<", "Меньше (<)" }
@@ -161,7 +167,7 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
                             if let Ok(d) = chrono::NaiveDate::parse_from_str(&e.value(), "%Y-%m-%d") {
                                 start_date.set(naive_day_start(d));
                             }
-                        }
+                        },
                     }
                 }
                 div {
@@ -174,7 +180,7 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
                             if let Ok(d) = chrono::NaiveDate::parse_from_str(&e.value(), "%Y-%m-%d") {
                                 end_date.set(naive_day_start(d));
                             }
-                        }
+                        },
                     }
                 }
             }
@@ -245,7 +251,11 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
 
                     props.on_save.call(goal);
                 },
-                if is_edit { "Сохранить" } else { "Создать" }
+                if is_edit {
+                    "Сохранить"
+                } else {
+                    "Создать"
+                }
             }
         }
     }
