@@ -55,7 +55,7 @@ pub fn Toaster() -> Element {
                                     key: "{toast.id}",
 
                                     class: format!(
-                                        "{border} bg-secondary/50 p-2 border text-xs rounded-lg backdrop-blur-lg {te_align_show} {}",
+                                        "{border} glass p-2 text-xs rounded-lg {te_align_show} {}",
                                         if is_closing { te_align_exit } else { "" },
                                     ),
 

@@ -13,7 +13,7 @@ pub fn Navigate() -> Element {
     let mut visible = use_signal(|| false);
 
     rsx! {
-        div { class: "fixed z-100 bottom-3 right-3 flex flex-col gap-1 p-1  items-center rounded-full bg-secondary/40 backdrop-blur-lg",
+        div { class: "fixed z-100 bottom-3 right-3 flex flex-col gap-1 p-1  items-center rounded-full glass",
             button {
                 onclick: move |_| {
                     let t_visible = visible.read().clone();
@@ -27,7 +27,7 @@ pub fn Navigate() -> Element {
                 }
             }
             if visible.read().clone() {
-                div { class: "absolute -translate-y-[100%] -mt-2 p-1 py-2 -top-0 left-0 flex flex-col gap-2 rounded-lg bg-secondary/60 backdrop-blur-lg show-bottom",
+                div { class: "absolute -translate-y-[100%] -mt-2 p-1 py-2 -top-0 left-0 flex flex-col gap-2 rounded-lg glass show-bottom",
                     Tooltip {
                         text: "Главная странице",
                         align: TooltipAlign::Left,

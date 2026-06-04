@@ -290,7 +290,7 @@ pub fn Header() -> Element {
                                         _ => {}
                                     }
                                 },
-                                class: "w-[26px] h-[26px] absolute backdrop-blur-md bg-secondary/30 rounded-md flex justify-center items-center cursor-pointer top-0 -right-7.5  border  border-border/40 aspect-square hover:bg-primary/10 transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                                class: "w-[26px] h-[26px] absolute glass rounded-md flex justify-center items-center cursor-pointer top-0 -right-7.5  border  aspect-square hover:bg-primary/10 transition-colors focus:ring-2 focus:ring-primary focus:ring-offset-1",
                                 tabindex: 0,
                                 role: "button",
                                 aria_label: "Добавить задачу",

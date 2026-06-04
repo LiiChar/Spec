@@ -61,13 +61,7 @@
         -moz-appearance: textfield;
     }
 
-    .glass {
-        background: var(--secondary-glass);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid var(--border-glass);
-        box-shadow: var(--glass-shadow);
-    }
+
 }
 @layer utilities {
     @media (max-height: 12px) {

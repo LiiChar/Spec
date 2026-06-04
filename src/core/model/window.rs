@@ -68,4 +68,5 @@ pub struct WindowModel {
 
     pub timestamp: u64,
     pub duration: u64,
+    pub color: String,
 }

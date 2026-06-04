@@ -381,7 +381,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                             evt.stop_propagation();
                                             selected_hour.set(None);
                                         },
-                                        class: "absolute z-40  border border-border/0 hover:border-border/40 rounded-md p-1 right-1 top-1 hover:bg-background/50 hover:backdrop-blur-lg text-xs opacity-60",
+                                        class: "absolute z-40  rounded-md p-1 right-1 top-1 glass text-xs opacity-60",
                                         Icon { icon: LdArrowUpToLine, height: 12, width: 12 }
                                     }
                                 }
