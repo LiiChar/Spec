@@ -80,6 +80,7 @@ pub mod tag {
     pub const COL_NAME: &str = "name";
     pub const COL_DESCRIPTION: &str = "description";
     pub const COL_COLOR: &str = "color";
+    pub const COL_FILTER: &str = "filter";
 }
 
 /// Tag to Window mapping table schema

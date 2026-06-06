@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::LdX;
 
-use crate::{core::JobModel, ui::{AppProvider, JobForm, use_app}};
+use crate::{core::JobModel, ui::{AppProvider, job_form::JobForm, use_app}};
 use dioxus_free_icons::Icon;
 
 #[derive(Props, PartialEq, Clone)]

@@ -5,9 +5,9 @@ use dioxus::prelude::*;
 use palette::{Srgba, WithAlpha};
 
 use crate::{
-    core::{EventModel, EventType, JobModel},
+    core::{EventModel, EventType, JobModel, TagModel, with_database},
     lib::{CronExpr, color::{foreground_color, idle_color, set_alpha, soften_color}, convert_ts_to_local_date, format_duration_short, get_process_color},
-    ui::{TimelineOrientation, Tooltip, TooltipAlign},
+    ui::{TimelineOrientation, Tooltip, TooltipAlign, app},
 };
 
 #[derive(Props, PartialEq, Clone)]
@@ -145,16 +145,21 @@ pub fn EventElement(props: EventsElementProps) -> Element {
             style: props.style.clone(),
 
             {
+                let jobs_ref = &jobs;
                 jobs
-                    .into_iter()
+                    .iter()
                     .enumerate()
                     .filter_map(|(i, job)| {
+
+                        let start_ts = job.start_ts;
+                        let end_ts = job.end_ts;
+
                         let range_start = (props.start_hour * 3_600_000) as i64;
                         let range_end = ((props.end_hour + 1) * 3_600_000) as i64;
 
                         let (start_ms, mut end_ms) = {
-                            let default_start = convert_ts_to_local_date(job.start_ts as u64);
-                            let default_end = convert_ts_to_local_date(job.end_ts as u64);
+                            let default_start = convert_ts_to_local_date(start_ts as u64);
+                            let default_end = convert_ts_to_local_date(end_ts as u64);
 
                             let cron = job.cron.as_ref()
                                 .and_then(|c| CronExpr::parse(c).ok());
@@ -213,16 +218,26 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         let offset = (event_start_ms / total_ms) * 100.0;
                         let size = (duration_ms / total_ms) * 100.0;
 
-                        let is_select = match props.selected_job.read().as_ref() {
-                            Some(j) => {
-                                format!("{}{}{}", job.name, job.start_ts, job.end_ts)
-                                    == format!("{}{}{}", j.name, j.start_ts, j.end_ts)
-                            }
-                            None => false,
-                        };
-
                         let has_prev = start_ms < range_start;
                         let has_next = end_ms > range_end;
+
+                        let job_width = 3;
+
+                        let cron = job.cron.as_ref()
+                                .and_then(|c| CronExpr::parse(c).ok()).unwrap();
+                                                    
+
+                        let mut border_offset = 0;
+
+                        for index in 0..i {
+                            let i_job = &jobs_ref[index];
+                            let i_job_cron = i_job.cron.as_ref()
+                                .and_then(|c| CronExpr::parse(c).ok()).unwrap();
+
+                            if cron.compare(&i_job_cron, false, Some("+ + + - - - -".to_string())) {
+                                border_offset += job_width;
+                            }
+                        }
 
                         Some({
                             let value = job.clone();
@@ -246,20 +261,20 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                         match orientation {
                                             TimelineOrientation::Vertical => {
                                                 format!(
-                                                    "top: {}%; height: {}%; width: {}; right: {}px;",
+                                                    "top: {}%; height: {}%; width: {}px; right: {}px;",
                                                     offset,
                                                     size.max(0.5),
-                                                    "3px",
-                                                    i * 3
+                                                    job_width,
+                                                    border_offset
                                                 )
                                             }
                                             TimelineOrientation::Horizontal => {
                                                 format!(
-                                                    "left: {}%; width: {}%; height: {}; top: {}px;",
+                                                    "left: {}%; width: {}%; height: {}px; top: {}px;",
                                                     offset,
                                                     size.max(0.5),
-                                                    "3px",
-                                                    i * 3
+                                                    job_width,
+                                                    border_offset
                                                 )
                                             }
                                         },
@@ -269,6 +284,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                         align: TooltipAlign::Left,
                                         text: "{job.name}",
                                         at_cursor: true,
+                                        gap: 2,
                                         div {
                                             class: "w-full h-full"
                                         }
@@ -281,6 +297,8 @@ pub fn EventElement(props: EventsElementProps) -> Element {
 
             {
                 let mut events = props.events;
+
+                
 
                 // длинные сначала
                 events.sort_by(|a, b| b.duration.cmp(&a.duration));
@@ -347,6 +365,9 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         if is_idle {
                             evt_color = idle_color(&evt_color);
                         }
+
+                        let evt_color = color.clone();
+
 
 
                         let track_px = match props.orientation {
@@ -454,8 +475,14 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                                 }
 
                                                 div {
-                                                    class: "text-muted-foreground/60 text-xs overflow-hidden text-ellipsis",
-                                                    "{process_name}"
+                                                    class: "text-muted-foreground/60 text-xs text-foreground/55 overflow-hidden text-ellipsis flex gap-1",
+                                                    span { "{process_name}" }
+                                                    span { "-" }
+                                                    if is_idle {
+                                                        span { "idle" }
+                                                    } else {
+                                                        span { "active" }
+                                                    }
                                                 }
 
                                                 div {
@@ -467,37 +494,56 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     })
                                 }
 
+                                
+
                                 if !is_micro && lane == 0 && label.is_some() {
                                     div {
-                                        class: format!("absolute inset-0 left-8 right-4 px-1 flex items-center justify-center pointer-events-none select-none text-[10px] {}", foreground_color(&color, "text-background".to_owned(), "text-foreground".to_owned())),
                                         div {
-                                            class: "flex gap-1 items-center w-full justify-between pointer-events-none select-none",
-
-                                            if let Some(label) = label {
-                                                div {
-                                                    class: "flex gap-1 items-center justify-center",
-                                                    // div {
-                                                    //     class: format!("w-1 h-1 rounded-full bg-primary transition-all {}",
-                                                    //         if is_idle {
-                                                    //             "bg-gray-500"
-                                                    //         } else {
-                                                    //             ""
-                                                    //         }
-                                                    //     ),
-                                                    // }
-                                                    span {
-                                                        class: "truncate whitespace-nowrap font-medium leading-none",
-                                                        "{label}"
+                                            class: format!("text-[10px] {}", foreground_color(&color, "text-background".to_owned(), "text-foreground".to_owned())),
+                                            div {
+                                                 class: "absolute left-10 top-1/2 -translate-y-1/2 h-full py-1 flex items-center justify-center",
+                                                {
+                                                    let tags = event.window.as_ref().map(|w| w.tags.clone()).unwrap_or_default();
+                                                    rsx! {
+                                                        div { 
+                                                            class: "flex gap-0.5 h-full relative z-1",
+                                                            for tag in tags {
+                                                                Tooltip {
+                                                                    align: TooltipAlign::Right,
+                                                                    text: "{tag.name}",
+                                                                    at_cursor: true,
+                                                                    gap: 2,
+                                                                    div {
+                                                                        class: "w-[5px] h-full rounded-md",
+                                                                        style: format!("background-color: {}; height: {}", tag.color, if props.is_selected { "100%" } else { "0px" }),
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
-                                            span {
-                                                class: "whitespace-nowrap",
+                                            if let Some(label) = label {
+                                                div {
+                                                    class: "whitespace-nowrap absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none select-none",
+                                                    div {
+                                                        class: "flex gap-1 items-center justify-center h-full pointer-events-none",
+                                                        
+                                                        span {
+                                                            class: "truncate whitespace-nowrap font-medium leading-none",
+                                                            "{label}"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            div {
+                                                class: "whitespace-nowrap absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none select-none",
                                                 "{duration_formatted}"
                                             }
+                                        
                                         }
-
                                     }
+
                                 }
                             }
                         }

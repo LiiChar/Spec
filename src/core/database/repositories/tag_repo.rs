@@ -2,7 +2,7 @@
 /// Manages tags and their associations with windows
 
 use rusqlite::{Connection, Result};
-use crate::core::TagModel;
+use crate::core::{EventModel, TagModel};
 use super::super::schema::{tag as tag_schema, tag_to_window as t2w_schema};
 
 pub struct TagRepository;
@@ -12,11 +12,12 @@ impl TagRepository {
     pub fn get_all(conn: &Connection) -> Result<Vec<TagModel>> {
         let mut stmt = conn.prepare(
             &format!(
-                "SELECT {}, {}, {}, {} FROM {}",
+                "SELECT {}, {}, {}, {}, {} FROM {}",
                 tag_schema::COL_ID,
                 tag_schema::COL_NAME,
                 tag_schema::COL_DESCRIPTION,
                 tag_schema::COL_COLOR,
+                tag_schema::COL_FILTER,
                 tag_schema::TABLE
             )
         )?;
@@ -27,6 +28,7 @@ impl TagRepository {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 color: row.get(3)?,
+                filter: row.get(4)?,
             })
         })?;
 
@@ -37,11 +39,12 @@ impl TagRepository {
     pub fn get_by_name(conn: &Connection, name: &str) -> Result<Option<TagModel>> {
         let mut stmt = conn.prepare(
             &format!(
-                "SELECT {}, {}, {}, {} FROM {} WHERE {} = ?1",
+                "SELECT {}, {}, {}, {}, {} FROM {} WHERE {} = ?1",
                 tag_schema::COL_ID,
                 tag_schema::COL_NAME,
                 tag_schema::COL_DESCRIPTION,
                 tag_schema::COL_COLOR,
+                tag_schema::COL_FILTER,
                 tag_schema::TABLE,
                 tag_schema::COL_NAME
             )
@@ -53,6 +56,7 @@ impl TagRepository {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 color: row.get(3)?,
+                filter: row.get(4)?,
             })
         }) {
             Ok(tag) => Ok(Some(tag)),
@@ -62,20 +66,21 @@ impl TagRepository {
     }
 
     /// Create or get existing tag (idempotent)
-    pub fn ensure(conn: &Connection, name: &str, color: &str) -> Result<TagModel> {
+    pub fn ensure(conn: &Connection, name: &str, color: &str, filter: Option<String>) -> Result<TagModel> {
         if let Some(tag) = Self::get_by_name(conn, name)? {
             return Ok(tag);
         }
 
         conn.execute(
             &format!(
-                "INSERT INTO {} ({}, {}, {}) VALUES (?1, NULL, ?2)",
+                "INSERT INTO {} ({}, {}, {}, {}) VALUES (?1, NULL, ?2)",
                 tag_schema::TABLE,
                 tag_schema::COL_NAME,
                 tag_schema::COL_DESCRIPTION,
-                tag_schema::COL_COLOR
+                tag_schema::COL_COLOR,
+                tag_schema::COL_FILTER
             ),
-            (name, color),
+            (name, color, filter.clone()),
         )?;
 
         Ok(TagModel {
@@ -83,6 +88,7 @@ impl TagRepository {
             name: name.to_string(),
             description: None,
             color: color.to_string(),
+            filter,
         })
     }
 
@@ -91,7 +97,7 @@ impl TagRepository {
         let mut stmt = conn.prepare(
             &format!(
                 r#"
-                SELECT t.{}, t.{}, t.{}, t.{}
+                SELECT t.{}, t.{}, t.{}, t.{}, t.{}
                 FROM {} w
                 JOIN {} t ON t.{} = w.{}
                 WHERE LOWER(TRIM(w.{})) = LOWER(TRIM(?1))
@@ -100,6 +106,7 @@ impl TagRepository {
                 tag_schema::COL_NAME,
                 tag_schema::COL_DESCRIPTION,
                 tag_schema::COL_COLOR,
+                tag_schema::COL_FILTER,
                 t2w_schema::TABLE,
                 tag_schema::TABLE,
                 tag_schema::COL_ID,
@@ -114,6 +121,7 @@ impl TagRepository {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 color: row.get(3)?,
+                filter: row.get(4)?,
             })
         })?;
 
@@ -152,7 +160,7 @@ impl TagRepository {
 
     /// Add tag to window if not already present
     pub fn add_to_window_if_missing(conn: &Connection, tag_name: &str, process_name: &str) -> Result<()> {
-        let tag = Self::ensure(conn, tag_name, "#94a3b8")?;
+        let tag = Self::ensure(conn, tag_name, "#94a3b8", None)?;
         let tag_id = tag.id.ok_or(rusqlite::Error::QueryReturnedNoRows)?;
 
         if !Self::has_for_window(conn, process_name, tag_id)? {
@@ -169,18 +177,62 @@ impl TagRepository {
             if !Self::get_by_name(conn, &t.name)?.is_some() {
                 conn.execute(
                     &format!(
-                        "INSERT INTO {} ({}, {}, {}) VALUES (?1, ?2, ?3)",
+                        "INSERT INTO {} ({}, {}, {}, {}) VALUES (?1, ?2, ?3)",
                         tag_schema::TABLE,
                         tag_schema::COL_NAME,
                         tag_schema::COL_DESCRIPTION,
-                        tag_schema::COL_COLOR
+                        tag_schema::COL_COLOR,
+                        tag_schema::COL_FILTER
                     ),
-                    (&t.name, &t.description, &t.color),
+                    (&t.name, &t.description, &t.color, &t.filter),
                 )?;
                 inserted += 1;
             }
         }
         Ok(inserted)
+    }
+
+    pub fn update(conn: &Connection, tag: &TagModel) -> Result<usize> {
+        let mut stmt = conn.prepare(
+            &format!(
+                "UPDATE {} SET {} = ?, {}, {} = ?, {} = ? WHERE {} = ?1 and {} = ?2",
+                tag_schema::TABLE,
+                tag_schema::COL_NAME,
+                tag_schema::COL_DESCRIPTION,
+                tag_schema::COL_COLOR,
+                tag_schema::COL_FILTER,
+                tag_schema::COL_ID,
+                tag_schema::COL_NAME,
+            ),
+        )?;
+
+        let id = stmt.execute(
+            &[
+                &tag.name,
+                &tag.description.clone().unwrap_or("".to_string()),
+                &tag.color,
+                &tag.filter.clone().unwrap_or("".to_string()),
+                &tag.id.unwrap_or(-1).to_string(),
+                &tag.name,
+
+            ],
+        )?;
+
+        Ok(id)
+    }
+
+    pub fn delete(conn: &Connection, id: i64) -> Result<()> {
+        let mut stmt = conn.prepare(
+            &format!(
+                "DELETE FROM {} WHERE {} = ?1",
+                tag_schema::TABLE,
+                tag_schema::COL_ID
+            ),
+        )?;
+
+        stmt.execute(&[&id])?;
+
+        Ok(())
     }
 }
 
@@ -193,4 +245,24 @@ mod tests {
         assert_eq!(tag_schema::TABLE, "tag");
         assert_eq!(t2w_schema::TABLE, "tag_to_window");
     }
+}
+
+pub fn attach_tags(
+    conn: &Connection,
+    events: Vec<EventModel>,
+) -> Vec<EventModel> {
+    events
+        .into_iter()
+        .map(|mut event| {
+            if let Some(window) = &mut event.window {
+                window.tags = TagRepository::get_for_process(
+                    conn,
+                    &window.process_name,
+                )
+                .unwrap_or_default();
+            }
+
+            event
+        })
+        .collect()
 }

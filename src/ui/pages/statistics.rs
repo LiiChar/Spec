@@ -6,9 +6,9 @@ use dioxus_free_icons::icons::ld_icons::LdTrash;
 use dioxus_free_icons::Icon;
 
 use crate::{
-    core::{EventModel, EventType, GoalModel, JobModel, with_database, with_database_mut},
-    lib::{convert_ts_to_local_date, format_duration_short},
-    ui::{Calendar, GoalForm, JobForm, Tooltip, TooltipAlign, use_app, use_toast},
+    core::{EventModel, EventType, GoalModel, JobModel, get_app_uptime, get_boot_time, get_uptime, with_database, with_database_mut},
+    lib::{convert_ts_to_local_date, format_duration, format_duration_short},
+    ui::{Button, Calendar, Tooltip, TooltipAlign, goal_form::GoalForm, job_form::JobForm, tag_modal::TagModal, use_app, use_toast, widget::window::window::Windows},
 };
 use chrono::Local;
 
@@ -238,6 +238,8 @@ pub fn StatisticsPage() -> Element {
     let mut date_to = use_signal(String::new);
     let mut app_filter = use_signal(String::new);
 
+    let mut tag_modal_visible = use_signal(|| false);
+
     use_effect(move || {
         spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -268,17 +270,17 @@ pub fn StatisticsPage() -> Element {
     };
 
     rsx! {
+        if tag_modal_visible() {
+            TagModal {
+                on_close: move |_| tag_modal_visible.set(false),
+            }
+        }
         div { class: "mx-auto flex w-full max-w-7xl flex-col gap-4 p-2 pb-20",
             div { class: "flex flex-col gap-1",
                 h1 { class: "text-xl font-semibold text-foreground",
                     "Статистика использования"
                 }
-                p { class: "text-sm text-foreground/60",
-                    "Сводка по всем дням, приложениям, активности и пикам работы за компьютером."
-                }
             }
-
-            GoalsJobsPanel {}
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div { class: "grid gap-3 md:grid-cols-4",
@@ -302,6 +304,10 @@ pub fn StatisticsPage() -> Element {
                 }
             }
 
+            GoalsJobsPanel {}
+
+            
+
             if is_loading() {
                 div { class: "rounded-md border border-border/40 bg-background/70 p-4 text-sm text-foreground/70",
                     "Загружаю статистику..."
@@ -311,7 +317,7 @@ pub fn StatisticsPage() -> Element {
                     "{load_error}"
                 }
             } else {
-                div { class: "grid gap-3 md:grid-cols-2 xl:grid-cols-4",
+                div { class: "grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
                     MetricCard {
                         title: "Общее время".to_string(),
                         value: format_duration_short(view.total_ms),
@@ -337,6 +343,21 @@ pub fn StatisticsPage() -> Element {
                             .as_ref()
                             .map(|app| format_duration_short(app.total_ms()))
                             .unwrap_or_default(),
+                    }
+                    MetricCard {
+                        title: "Время работы приложения".to_string(),
+                        value: format_duration_short(get_app_uptime()),
+                        hint: format!(""),
+                    }
+                    MetricCard {
+                        title: "Общее работы компльютера".to_string(),
+                        value: format_duration_short(get_uptime()),
+                        hint: format!(""),
+                    }
+                    MetricCard {
+                        title: "Время запуска компьютера".to_string(),
+                        value: convert_ts_to_local_date(get_boot_time() as u64).format("%H:%M:%S").to_string(),
+                        hint: format!(""),
                     }
                 }
 
@@ -394,17 +415,22 @@ pub fn StatisticsPage() -> Element {
 
                 div { class: "grid gap-4 xl:grid-cols-2",
                     section { class: "rounded-md border border-border/40 bg-background/70 p-4",
-                        h2 { class: "mb-4 text-base font-semibold text-foreground",
-                            "Приложения"
-                        }
-                        div { class: "flex flex-col gap-2",
-                            for app in view.apps.iter().take(15).cloned() {
-                                AppRow {
-                                    app,
-                                    max_ms: most_used_app.as_ref().map(|app| app.total_ms()).unwrap_or(1),
+                        div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",
+                            div { class: "flex justify-between items-center gap-3 w-full",
+                                h2 { class: "text-base font-semibold text-foreground", "Приложения" }
+                                div {
+                                    Button {
+                                        class: "px-3! py-1.5! text-xs font-medium",
+                                        onclick: move |_| {
+                                            tag_modal_visible.set(true);
+                                        },
+                                        "Добавить тег"
+                                    }
                                 }
                             }
                         }
+
+                        div { class: "flex flex-wrap gap-2 max-h-96 overflow-y-auto", Windows {} }
                     }
 
                     section { class: "rounded-md border border-border/40 bg-background/70 p-4",
@@ -427,6 +453,12 @@ pub fn StatisticsPage() -> Element {
 fn GoalsJobsPanel() -> Element {
     let app = use_app();
     let mut toast = use_toast();
+
+    let u_app= app.clone();
+
+    let update = move |job: JobModel| {
+        u_app.update_jobs(job);
+    };
 
     let jobs = app.jobs;
     let goals = app.goals;
@@ -655,18 +687,7 @@ fn GoalsJobsPanel() -> Element {
                         start_ts: 9 * 3600,
                         end_ts: 18 * 3600,
                         on_save: Callback::new(move |job: JobModel| {
-                            spawn(async move {
-                                let _ = tokio::task::spawn_blocking(move || {
-                                        with_database_mut(|db| {
-                                            if job.id.is_some() {
-                                                db.update_job(&job)
-                                            } else {
-                                                db.save_job(&job).map(|_| ())
-                                            }
-                                        })
-                                    })
-                                    .await;
-                            });
+                            update(job.clone());
                             show_job_form.set(false);
                         }),
                         on_cancel: Callback::new(move |_| show_job_form.set(false)),
@@ -719,7 +740,7 @@ fn DailyUsageChart(days: Vec<DayUsage>) -> Element {
                 }
             }
 
-            div { class: "relative flex h-full items-end gap-2 pb-8 pt-6 overflow-visiblemt-2 grid grid-cols-2 gap-2 text-xs text-foreground/55",
+            div { class: "relative flex h-full items-end gap-2 pb-8 pt-6 overflow-visible",
                 for day in visible_days.into_iter().rev() {
                     DailyUsageBar { day, max_ms }
                 }
@@ -735,7 +756,11 @@ fn DailyUsageChart(days: Vec<DayUsage>) -> Element {
 
 #[component]
 fn DailyUsageBar(day: DayUsage, max_ms: u64) -> Element {
-    let bar_height = ((day.total_ms as f64 / max_ms as f64) * 220.0).max(8.0);
+    let bar_height = if max_ms > 0 {
+        ((day.total_ms as f64 / max_ms as f64) * 220.0).max(8.0)
+    } else {
+        0.0
+    };
     let active_height = if day.total_ms > 0 {
         (day.active_ms as f64 / day.total_ms as f64) * bar_height
     } else {
@@ -743,7 +768,7 @@ fn DailyUsageBar(day: DayUsage, max_ms: u64) -> Element {
     };
     let idle_height = (bar_height - active_height).max(0.0);
 
-    rsx! {
+rsx! {
         div { class: "group relative flex h-[250px] min-w-8 flex-1 flex-col items-center justify-start gap-2 ",
 
             Tooltip {
@@ -767,7 +792,7 @@ fn DailyUsageBar(day: DayUsage, max_ms: u64) -> Element {
                         style: "height: {idle_height}px;",
                     }
                     div {
-                        class: "w-full bg-primary shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_35%,transparent)]",
+                        class: "w-full bg-primary",
                         style: "height: {active_height}px;",
                     }
                 }
@@ -802,14 +827,19 @@ fn HourActivityChart(hours: Vec<HourUsage>) -> Element {
 
 #[component]
 fn HourActivityCell(hour: HourUsage, max_ms: u64) -> Element {
-    let intensity = (hour.total_ms as f64 / max_ms as f64).clamp(0.0, 1.0);
-    let fill_height = (intensity * 72.0).max(if hour.total_ms > 0 { 6.0 } else { 0.0 });
-    let active_percent = if hour.total_ms > 0 {
-        (hour.active_ms as f64 / hour.total_ms as f64) * 100.0
+    let (intensity, fill_height, active_percent, alpha) = if max_ms > 0 {
+        let intensity = (hour.total_ms as f64 / max_ms as f64).clamp(0.0, 1.0);
+        let fill_height = (intensity * 72.0).max(if hour.total_ms > 0 { 6.0 } else { 0.0 });
+        let active_percent = if hour.total_ms > 0 {
+            (hour.active_ms as f64 / hour.total_ms as f64) * 100.0
+        } else {
+            0.0
+        };
+        let alpha = 0.08 + intensity * 0.28;
+        (intensity, fill_height, active_percent, alpha)
     } else {
-        0.0
+        (0.0, 0.0, 0.0, 0.08)
     };
-    let alpha = 0.08 + intensity * 0.28;
 
     rsx! {
 
@@ -833,14 +863,19 @@ fn HourActivityCell(hour: HourUsage, max_ms: u64) -> Element {
 
 #[component]
 fn DailyBar(day: DayUsage, max_ms: u64) -> Element {
-    let height = ((day.total_ms as f64 / max_ms as f64) * 100.0).max(2.0);
-    let active_height = if day.total_ms > 0 {
-        (day.active_ms as f64 / day.total_ms as f64) * 100.0
+    let (height, active_height) = if max_ms > 0 {
+        let h = ((day.total_ms as f64 / max_ms as f64) * 100.0).max(2.0);
+        let ah = if day.total_ms > 0 {
+            (day.active_ms as f64 / day.total_ms as f64) * 100.0
+        } else {
+            0.0
+        };
+        (h, ah)
     } else {
-        0.0
+        (0.0, 0.0)
     };
 
-    rsx! {
+     rsx! {
         div { class: "group flex min-w-8 flex-1 flex-col items-center justify-end gap-1",
             Tooltip {
                 align: TooltipAlign::Right,
@@ -891,7 +926,11 @@ fn HourCell(hour: HourUsage, max_ms: u64) -> Element {
 
 #[component]
 fn AppRow(app: AppUsage, max_ms: u64) -> Element {
-    let width = ((app.total_ms() as f64 / max_ms as f64) * 100.0).max(2.0);
+   let width = if max_ms > 0 {
+        ((app.total_ms() as f64 / max_ms as f64) * 100.0).max(2.0)
+    } else {
+        0.0
+    };
 
     rsx! {
         div { class: "rounded-md border border-border/30 p-3",

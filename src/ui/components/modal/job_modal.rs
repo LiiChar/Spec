@@ -8,7 +8,7 @@ use crate::ui::{Button, use_alert, use_toast};
 use crate::{
     core::{EventModel, JobModel, with_database, with_database_mut},
     lib::{convert_ts_to_date, convert_ts_to_local_date},
-    ui::{JobForm, use_app},
+    ui::{job_form::JobForm, use_app},
 };
 
 fn job_anchor_day(job: &JobModel) -> NaiveDate {

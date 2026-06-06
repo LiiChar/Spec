@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use chrono::{DateTime, Local};
 
 use crate::{
-    core::{EventModel, GoalModel, JobModel, with_database, with_database_mut},
+    core::{EventModel, GoalModel, JobModel, TagModel, with_database, with_database_mut},
     ui::Page,
 };
 
@@ -42,6 +42,7 @@ pub struct AppProvider {
     pub events: Signal<Vec<EventModel>>,
     pub jobs: Signal<Vec<JobModel>>,
     pub goals: Signal<Vec<GoalModel>>,
+    pub tags: Signal<Vec<TagModel>>,
     pub variant: Signal<AppVariant>,
 }
 
@@ -57,6 +58,7 @@ impl Default for AppProvider {
             start_time: Signal::new(None),
             jobs: Signal::new(Vec::new()),
             goals: Signal::new(Vec::new()),
+            tags: Signal::new(Vec::new()),
             variant: Signal::new(AppVariant::Events),
         }
     }
@@ -156,6 +158,56 @@ impl AppProvider {
                     if let Ok(goals) = with_database(|db| db.get_goals()) {
                        ctx_goals.set(goals);
                     }
+                }
+                Ok(Err(e)) => println!("DB error: {:?}", e),
+                Err(e) => println!("Task error: {:?}", e),
+            }
+        });
+    }
+    pub fn update_tag(&self, tag: TagModel) {
+        let mut ctx_tag: Signal<Vec<TagModel>> = self.tags;
+        let name = tag.name.clone();
+        spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                with_database_mut(|db| {
+                    if tag.id.is_some() {
+                        println!("Update tag with name: {}", name);
+                        db.update_tag(&tag).map(|_| ())
+                    } else {
+                        println!("Saved tag with name: {}", name);
+                        db.ensure_tag(&tag.name, &tag.color, tag.filter).map(|_| ())
+                    }
+                })
+            })
+            .await;
+
+            match result {
+                Ok(Ok(id)) => {
+                    if let Ok(tag) = with_database(|db| db.get_tags()) {
+                       ctx_tag.set(tag);
+                    }
+                }
+                Ok(Err(e)) => println!("DB error: {:?}", e),
+                Err(e) => println!("Task error: {:?}", e),
+            }
+        });
+    }
+    pub fn delete_tag(&self, id: i64) {
+        let mut ctx_tag: Signal<Vec<TagModel>> = self.tags;
+        spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                with_database_mut(|db| {
+                    db.delete_job(id).map(|_| ())
+                })
+            })
+            .await;
+
+            match result {
+                Ok(Ok(_)) => {
+                    if let Ok(tags) = with_database(|db| db.get_tags()) {
+                       ctx_tag.set(tags);
+                    }
+                    println!("Deleted tag id: {}", id);
                 }
                 Ok(Err(e)) => println!("DB error: {:?}", e),
                 Err(e) => println!("Task error: {:?}", e),

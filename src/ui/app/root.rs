@@ -26,6 +26,8 @@ pub fn Root() -> Element {
 
     let mut events = context.events;
     let mut jobs = context.jobs;
+    let mut tags = context.tags;
+    
     let day = context.day;
     let time = context.time;
     let start_time = context.start_time;
@@ -105,6 +107,16 @@ pub fn Root() -> Element {
 
                 if let Ok(jobs_loaded) = result {
                     jobs.set(jobs_loaded);
+                }
+
+                let result = tokio::task::spawn_blocking(move || {
+                    with_database(|db| db.get_tags())
+                })
+                .await
+                .unwrap();
+
+                if let Ok(tags_loaded) = result {
+                    tags.set(tags_loaded);
                 }
             });
         });

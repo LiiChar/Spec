@@ -41,7 +41,7 @@ impl WindowRepository {
         )?;
 
         let windows = stmt.query_map([], |row| {
-            Self::parse_window_row(conn, row)
+            Self::parse_window_row(conn, row, )
         })?;
 
         Ok(windows.collect::<Result<Vec<_>>>()?)
@@ -244,6 +244,7 @@ impl WindowRepository {
                 timestamp: timestamp as u64,
                 duration: duration as u64,
                 color,
+                tags: Vec::new(),
             },
             tags,
         ))

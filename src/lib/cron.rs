@@ -9,6 +9,8 @@ use std::{
     sync::Arc,
 };
 
+use crate::core::GoalOrder::Equal;
+
 
 
 /// Ошибки cron parser.
@@ -280,6 +282,8 @@ impl CronExpr {
         })
     }
 
+    
+
     /// Устанавливает timezone offset.
     ///
     /// Пример:
@@ -481,6 +485,158 @@ impl CronExpr {
         };
 
         is_match
+    }
+
+    fn matches_field(left: &Field, right: &Field, equal: bool) -> bool {
+        match (left, right) {
+            (Field::Any, _) | (_, Field::Any) => true,
+
+            (Field::Value(a), Field::Value(b)) => a == b,
+
+            (Field::Value(v), Field::Range(s, e))
+            | (Field::Range(s, e), Field::Value(v)) => {
+                if equal {
+                    v >= s && v <= e
+                } else {
+                    v > s && v < e
+                }
+            }
+
+            (Field::Value(v), Field::Step(step))
+            | (Field::Step(step), Field::Value(v)) => {
+                v % step == 0
+            }
+
+            (
+                Field::Value(v),
+                Field::RangeStep(start, end, step),
+            )
+            | (
+                Field::RangeStep(start, end, step),
+                Field::Value(v),
+            ) => {
+                if equal {
+                    v >= start
+                    && v <= end
+                    && (v - start) % step == 0
+                } else {
+                    v > start
+                    && v < end
+                    && (v - start) % step == 0
+                }
+            }
+
+            (Field::Range(a1, b1), Field::Range(a2, b2)) => {
+                if equal {
+                    a1 <= b2 && a2 <= b1
+                } else {
+                    a1 < b2 && a2 < b1
+                }
+            }
+
+            (Field::List(list), other)
+            | (other, Field::List(list)) => {
+                list.iter().any(|f| {
+                    Self::matches_field(f, other, equal)
+                })
+            }
+
+            (Field::Step(step1), Field::Step(step2)) => {
+                step1 == step2
+            }
+
+            (
+                Field::RangeStep(s1, e1, st1),
+                Field::RangeStep(s2, e2, st2),
+            ) => {
+                let start = (*s1).max(*s2);
+                let end = (*e1).min(*e2);
+
+                if start > end {
+                    return false;
+                }
+
+                (start..=end).any(|v| {
+                    (v - s1) % st1 == 0
+                        && (v - s2) % st2 == 0
+                })
+            }
+
+            _ => false,
+        }
+    }
+
+    pub fn compare(
+        &self,
+        expr: &CronExpr,
+        equal: bool,
+        filter: Option<String>,
+    ) -> bool {
+        let binding =
+            filter.unwrap_or("+ + + + + + +".into());
+
+        let filter =
+            binding.split_whitespace().collect::<Vec<_>>();
+
+        let mut matched = true;
+
+        if filter.get(0).unwrap_or(&"+") == &"+" {
+            matched &= Self::matches_field(
+                &self.second,
+                &expr.second,
+                equal
+            );
+        }
+
+        if filter.get(1).unwrap_or(&"+") == &"+" {
+            matched &= Self::matches_field(
+                &self.minute,
+                &expr.minute,
+                equal
+            );
+        }
+
+        if filter.get(2).unwrap_or(&"+") == &"+" {
+            matched &= Self::matches_field(
+                &self.hour,
+                &expr.hour,
+                equal
+            );
+        }
+
+        if filter.get(3).unwrap_or(&"+") == &"+" {
+            matched &= Self::matches_field(
+                &self.day,
+                &expr.day,
+                equal
+            );
+        }
+
+        if filter.get(4).unwrap_or(&"+") == &"+" {
+            matched &= Self::matches_field(
+                &self.month,
+                &expr.month,
+                equal
+            );
+        }
+
+        if filter.get(5).unwrap_or(&"+") == &"+" {
+            matched &= Self::matches_field(
+                &self.weekday,
+                &expr.weekday,
+                equal
+            );
+        }
+
+        if filter.get(6).unwrap_or(&"+") == &"+" {
+            matched &= Self::matches_field(
+                &self.year,
+                &expr.year,
+                equal
+            );
+        }
+
+        matched
     }
 
     /// Ищет следующую дату подходящую

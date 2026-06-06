@@ -6,7 +6,7 @@ use crate::{
     core::{
         EventModel, GoalModel, JobModel, TagModel, app_tag_preset_groups, with_database, with_database_mut
     },
-    ui::{AppProvider, Button, Language, Select, SelectContent, SelectItem, SelectTrigger, Switch, Theme, ToasterProvider, Windows, use_app, use_settings, use_toast},
+    ui::{Button, ButtonSize, Language, Select, SelectContent, SelectItem, SelectTrigger, Switch, Theme, use_app, use_settings, use_toast, widget::window::window::Windows},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -282,31 +282,7 @@ pub fn SettingsPage() -> Element {
                 }
             }
 
-            section { class: "rounded-md border border-border/40 bg-background/70 p-4",
-                div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",
-                    div { class: "flex justify-between items-center gap-3 w-full",
-                        h2 { class: "text-base font-semibold text-foreground", "Приложения" }
-                        div {
-                            Button {
-                                class: "py-1!",
-                                onclick: move |_| {
-                                    for group in app_tag_preset_groups() {
-                                        let title = group.title.to_string();
-                                        let tags: Vec<TagModel> = group.tags.iter().cloned().collect();
-                                        let inserted = with_database_mut(|db| db.merge_tags(&tags)).unwrap_or(0);
-                                        info((
-                                            format!("«{title}»: добавлено тегов: {inserted}."),
-                                            None,
-                                        ));
-                                    }
-                                },
-                                "Загрузить шаблоны тегов"
-                            }
-                        }
-                    }
-                }
-                div { class: "flex flex-wrap gap-2 max-h-96 overflow-y-auto", Windows {} }
-            }
+            
 
             section { class: "rounded-md border border-border/40 bg-background/70 p-4",
                 div { class: "mb-4 flex flex-wrap items-center justify-between gap-3",

@@ -273,9 +273,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
                         Some(description().trim().to_string())
                     };
                     let temp_cron = cron.read().clone();
-                    job.cron = if cron.read().clone().trim().is_empty() {
-                        Some("* * * * * * *".to_string())
-                    } else {
+                    job.cron = {
                         let start_v = start_time();
                         let start_h = start_v / 3600;
                         let start_m = (start_v % 3600) / 60;
@@ -302,7 +300,7 @@ pub fn JobForm(props: JobFormProps) -> Element {
                         .split(',')
                         .map(|s| s.trim())
                         .filter(|s| !s.is_empty())
-                        .map(|tag_name| TagModel::new(tag_name, None, "#94a3b8"))
+                        .map(|tag_name| TagModel::new(tag_name, None, "#94a3b8", None))
                         .collect();
                     props.on_save.call(job);
                 },

@@ -17,12 +17,7 @@ pub struct WindowitemProps {
 
 #[component]
 pub fn WindowItem(props: WindowitemProps) -> Element {
-    let mut all_tags = use_signal(Vec::new);
-
-    use_future(move || async move {
-        let tags = with_database(|db| db.get_tags().unwrap_or_default());
-        all_tags.set(tags);
-    });
+    let mut all_tags = use_app().tags;
 
     let app = use_app();
     let mut toast = use_toast();

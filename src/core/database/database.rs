@@ -117,8 +117,8 @@ impl Database {
     }
 
     /// Create or get existing tag
-    pub fn ensure_tag(&self, name: &str, color: &str) -> Result<TagModel> {
-        TagRepository::ensure(&self.conn, name, color)
+    pub fn ensure_tag(&self, name: &str, color: &str, filter: Option<String>) -> Result<TagModel> {
+        TagRepository::ensure(&self.conn, name, color, filter)
     }
 
     /// Get tags for a window
@@ -145,6 +145,14 @@ impl Database {
     /// Merge multiple tags
     pub fn merge_tags(&mut self, tags: &[TagModel]) -> Result<usize> {
         TagRepository::merge_many(&self.conn, tags)
+    }
+
+    pub fn update_tag(&self, tag: &TagModel) -> Result<usize> {
+        TagRepository::update(&self.conn, tag)
+    }
+
+    pub fn delete_tag(&self, id: i64) -> Result<()> {
+        TagRepository::delete(&self.conn, id)
     }
 
     // === JOB OPERATIONS ===

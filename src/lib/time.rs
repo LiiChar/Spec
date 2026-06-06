@@ -23,57 +23,67 @@ pub fn convert_ts_to_local_date(ts: u64) -> DateTime<Local> {
 pub fn format_duration(duration_ms: u64) -> String {
     let total_seconds = duration_ms / 1000;
 
-    if total_seconds == 0 {
-        return "0s".to_string();
+    let days = total_seconds / 86_400;
+    let hours = (total_seconds % 86_400) / 3_600;
+    let minutes = (total_seconds % 3_600) / 60;
+    let seconds = total_seconds % 60;
+
+    let mut parts = Vec::new();
+
+    if days > 0 {
+        parts.push(format!("{days}d"));
+    }
+    if hours > 0 {
+        parts.push(format!("{hours}h"));
+    }
+    if minutes > 0 {
+        parts.push(format!("{minutes}m"));
+    }
+    if seconds > 0 || parts.is_empty() {
+        parts.push(format!("{seconds}s"));
     }
 
-    let hours = total_seconds / 3600;
-    let remaining_after_hours = total_seconds % 3600;
-    let minutes = remaining_after_hours / 60;
-    let seconds = remaining_after_hours % 60;
-
-    match (hours, minutes, seconds) {
-        (h, m, s) if h > 0 => {
-            if m > 0 {
-                format!("{}h {}m", h, m)
-            } else {
-                format!("{}h", h)
-            }
-        }
-        (_, m, s) if m > 0 => {
-            if s > 0 {
-                format!("{}m {}s", m, s)
-            } else {
-                format!("{}m", m)
-            }
-        }
-        (_, _, s) => format!("{}s", s),
-    }
+    parts.join(" ")
 }
 
-/// Форматирует duration в компактный формат для отображения на UI
-/// Примеры:
-/// - 1000ms -> "1s"
-/// - 65000ms -> "1м 5с"
-/// - 3665000ms -> "1ч 1м"
 pub fn format_duration_short(duration_ms: u64) -> String {
     let total_seconds = duration_ms / 1000;
 
-    if total_seconds == 0 {
-        return "0с".to_string();
+    if total_seconds == 0 { 
+        return "0s".to_string();
     }
 
-    let hours = total_seconds / 3600;
-    let remaining_after_hours = total_seconds % 3600;
-    let minutes = remaining_after_hours / 60;
-    let seconds = remaining_after_hours % 60;
+    let days = total_seconds / 86_400;
+    let hours = (total_seconds % 86_400) / 3_600;
+    let minutes = (total_seconds % 3_600) / 60;
+    let seconds = total_seconds % 60;
 
-    match (hours, minutes, seconds) {
-        (h, m, _) if h > 0 => format!("{}ч {}м", h, m),
-        (_, m, s) if m > 0 => format!("{}м {}с", m, s),
-        (_, _, s) => format!("{}с", s),
+    match (days, hours, minutes, seconds) {
+        (d, h, _, _) if d > 0 => {
+            if h > 0 {
+                format!("{d}d {h}h")
+            } else {
+                format!("{d}d")
+            }
+        }
+        (_, h, m, _) if h > 0 => {
+            if m > 0 {
+                format!("{h}h {m}m")
+            } else {
+                format!("{h}h")
+            }
+        }
+        (_, _, m, s) if m > 0 => {
+            if s > 0 {
+                format!("{m}m {s}s")
+            } else {
+                format!("{m}m")
+            }
+        }
+        (_, _, _, s) => format!("{s}s"),
     }
 }
+
 
 pub fn get_start_day_ts() -> i64 {
     let now = Local::now();

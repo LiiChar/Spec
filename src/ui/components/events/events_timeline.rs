@@ -8,7 +8,7 @@ use dioxus_free_icons::Icon;
 use crate::{
     core::{EventModel, EventType, JobModel},
     lib::{CronExpr, color::foreground_color, convert_ts_to_local_date, merge_events},
-    ui::{EventElement, JobModal, use_settings},
+    ui::{EventElement, job_modal::JobModal, use_settings},
 };
 
 #[derive(PartialEq, Clone, Copy)]
@@ -407,7 +407,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                 if is_selected {
                                     {(1..6).map(|i| {
                                         rsx! {
-                                            div { class: "absolute left-2 z-40 text-xs opacity-60", style: format!("top: calc(100%/6*{})", i), {format!("{}:{}",start_hour, 60 / 6 * i)} }
+                                            div { class: "absolute left-2 z-40 text-xs opacity-60 pointer-events-none", style: format!("top: calc(100%/6*{})", i), {format!("{}:{}",start_hour, 60 / 6 * i)} }
                                         }
                                     })}
                                 }

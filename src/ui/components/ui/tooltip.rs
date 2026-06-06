@@ -186,8 +186,8 @@ pub fn Tooltip(props: TooltipProps) -> Element {
                         .min(client_w - half_w - BORDER_RIGHT_GAP);
 
                     let y = (evt_y)
-                        .max(half_h + BORDER_GAP)
-                        .min(client_h - half_h - BORDER_GAP);
+                        .max(tooltip_size()[1] + BORDER_GAP * 3.0)
+                        .min(client_h - BORDER_GAP);
 
                     position.set([x, y]);
                 };

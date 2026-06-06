@@ -9,7 +9,7 @@ use dioxus::{
 use dioxus_free_icons::icons::ld_icons::{LdArrowLeft, LdArrowRight, LdMinus, LdPlus, LdTarget};
 use dioxus_free_icons::Icon;
 
-use crate::ui::{JobFormModal, use_app, use_toast};
+use crate::ui::{job_form_modal::JobFormModal, use_app, use_toast};
 use crate::{
     core::{with_database, with_database_mut, JobModel},
     ui::{EventsCalendar, TimeInput},

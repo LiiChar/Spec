@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::{core::{TagModel, WindowModel}, ui::WindowItem};
+use crate::{core::{TagModel, WindowModel}, ui::window_item::WindowItem};
 
 #[derive(Props, Clone, PartialEq, Eq)]
 pub struct WindowListProps {

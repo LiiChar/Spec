@@ -216,7 +216,7 @@ pub fn GoalForm(props: GoalFormProps) -> Element {
                         .split(',')
                         .map(|s| s.trim())
                         .filter(|s| !s.is_empty())
-                        .map(|tag_name| TagModel::new(tag_name, None, "#a78bfa"))
+                        .map(|tag_name| TagModel::new(tag_name, None, "#a78bfa", None))
                         .collect();
 
                     let desc = if description().trim().is_empty() {

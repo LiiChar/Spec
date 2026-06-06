@@ -1,18 +1,20 @@
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use browser_url::{get_active_browser_url, is_browser_active};
 use dioxus::prelude::*;
 use base64::Engine;
 use image::{ImageBuffer, Rgba};
+use windows::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes, GetSystemTimes};
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Foundation::{FILETIME, HWND, RECT};
 use windows::Win32::Graphics::Gdi::{
     DeleteObject, GetDC, GetDIBits, GetObjectW, MonitorFromWindow, ReleaseDC, BITMAP, BITMAPINFO,
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HMONITOR, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::System::ProcessStatus::K32GetModuleFileNameExW;
-use windows::Win32::System::SystemInformation::GetTickCount;
+use windows::Win32::System::SystemInformation::{GetSystemTimeAsFileTime, GetTickCount, GetTickCount64};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
 use windows::Win32::UI::Shell::ExtractIconExW;
 use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
@@ -129,7 +131,8 @@ pub fn get_current_window(hwnd: Option<HWND>) -> Option<WindowModel> {
             timestamp: current_ts(),
             duration,
             icon_base64: icon,
-            color
+            color,
+            tags: Vec::new(),
         })
     }
 }
@@ -335,4 +338,64 @@ fn stable_icon_hash(value: &str) -> u64 {
         hash = hash.wrapping_mul(FNV_PRIME);
     }
     hash
+}
+
+pub fn get_uptime() -> u64 {
+    unsafe {
+        GetTickCount64()
+    }
+}
+
+const WINDOWS_TO_UNIX_EPOCH_100NS: u64 =
+    116444736000000000;
+
+pub fn get_boot_time() -> u64 {
+    unsafe {
+        let ft = GetSystemTimeAsFileTime();
+
+        let current_100ns =
+            ((ft.dwHighDateTime as u64) << 32)
+            | ft.dwLowDateTime as u64;
+
+        let uptime_ms = GetTickCount64();
+
+        let boot_100ns =
+            current_100ns - uptime_ms * 10_000;
+
+        (boot_100ns - WINDOWS_TO_UNIX_EPOCH_100NS) / 10_000
+    }
+}
+
+pub fn get_app_uptime() -> u64 {
+    unsafe {
+        let process = GetCurrentProcess();
+
+        let mut creation = FILETIME::default();
+        let mut exit = FILETIME::default();
+        let mut kernel = FILETIME::default();
+        let mut user = FILETIME::default();
+
+        GetProcessTimes(
+            process,
+            &mut creation,
+            &mut exit,
+            &mut kernel,
+            &mut user,
+        )
+        .unwrap();
+
+        let creation_100ns =
+            ((creation.dwHighDateTime as u64) << 32)
+            | creation.dwLowDateTime as u64;
+
+        let start_ms =
+            (creation_100ns - WINDOWS_TO_UNIX_EPOCH_100NS) / 10_000;
+
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        now_ms - start_ms
+    }
 }

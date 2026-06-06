@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::RECT;
 
+use crate::core::TagModel;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WindowVariant {
     Desktop(WindowDesktop),
@@ -69,4 +71,6 @@ pub struct WindowModel {
     pub timestamp: u64,
     pub duration: u64,
     pub color: String,
+    
+    pub tags: Vec<TagModel>,
 }

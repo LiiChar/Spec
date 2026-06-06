@@ -7,6 +7,7 @@ pub struct TagModel {
     pub name: String,
     pub description: Option<String>,
     pub color: String,
+    pub filter: Option<String>,
 }
 
 impl TagModel {
@@ -14,12 +15,14 @@ impl TagModel {
         name: impl Into<String>,
         description: Option<&str>,
         color: impl Into<String>,
+        filter: Option<String>,
     ) -> Self {
         Self {
             id: None,
             name: name.into(),
             description: description.map(String::from),
             color: color.into(),
+            filter,
         }
     }
 }

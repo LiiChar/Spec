@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     core::with_database,
-    ui::{use_app, WindowList},
+    ui::{use_app, window_list::WindowList},
 };
 
 #[component]

@@ -77,7 +77,7 @@ pub fn Events() -> Element {
                             }
                         }
 
-                        div { class: "hidden  lg:flex w-72 flex-col gap-3 bg-secondary/40 rounded-lg border border-border/30 p-4 ",
+                        div { class: "hidden  lg:flex w-72 flex-col gap-3 bg-secondary/40 rounded-lg border border-border/30 p-4 h-min",
 
                             div { class: "grid grid-cols-3 gap-2",
 
