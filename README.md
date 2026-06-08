@@ -1,17 +1,17 @@
-# Spec
+# Spexe
 
 > Desktop activity tracking for Windows, built with Rust and Dioxus.
 
-**Spec** is a native desktop application that observes active window usage on Windows, converts raw foreground-window changes into structured activity intervals, stores them in SQLite, and renders them in a real-time UI.
+**Spexe** is a native desktop application that observes active window usage on Windows, converts raw foreground-window changes into structured activity intervals, stores them in SQLite, and renders them in a real-time UI.
 
-Instead of recording noisy polling ticks, Spec models **continuous periods of activity** — making the collected data useful for inspection, analysis, and future productivity tooling.
+Instead of recording noisy polling ticks, Spexe models **continuous periods of activity** — making the collected data useful for inspection, analysis, and future productivity tooling.
 
 
-## Why Spec?
+## Why Spexe?
 
 Most activity trackers either collect raw event streams or behave like opaque black boxes.
 
-Spec is built around a simple idea:
+Spexe is built around a simple idea:
 
 > **turn operating-system observations into meaningful time intervals**
 
@@ -90,8 +90,8 @@ Recommended future additions:
 ### Clone
 
 ```bash
-git clone https://github.com/LiiChar/Spec
-cd spec
+git clone https://github.com/LiiChar/Spexe
+cd spexe
 ```
 
 ### Build
@@ -155,6 +155,8 @@ dx server
 1. Мягкие цвета для событий
 2. Отображать теги
 3. Тип отображения тегов, круги или палки
+4. Высота невыбранного сегмена - по умлочанию 800
+5. Высота выбранного сегмента - по умлочанию 800
 
 ### ❌ 5. Автоматическое тегирование приложений
 
@@ -188,3 +190,4 @@ dx server
 17. Добавить в timeline выбор промежутков
 18. Получение общей статистики работы компльютера, время запуска компьютера, продолжительность сессии 
 19. Отображение тегов рядома с названием события в timeline в виде цветной палочки, при наведении отображается название
+20. Добавить автоматический просчёт высоты текста в событиях на таймлайне

@@ -16,7 +16,7 @@
    "approve": true,
    "matchCommandLine": true
   },
-  "/^cd 'E:\\\\code\\\\pet-project\\\\Spec'; cargo check 2>&1$/": {
+  "/^cd 'E:\\\\code\\\\pet-project\\\\Spexe'; cargo check 2>&1$/": {
    "approve": true,
    "matchCommandLine": true
   },

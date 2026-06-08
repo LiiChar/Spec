@@ -362,13 +362,13 @@ pub fn EventElement(props: EventsElementProps) -> Element {
 
                         let mut evt_color = soften_color(&color, 0.4);
 
+                        let mut evt_color = color.clone();
                         if is_idle {
                             evt_color = idle_color(&evt_color);
                         }
 
-                        let evt_color = color.clone();
-
-
+                        
+                        
 
                         let track_px = match props.orientation {
                             TimelineOrientation::Vertical => {
@@ -382,7 +382,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                         let event_px = (size / 100.0) * track_px;
 
                         const DOT_THRESHOLD: f32 = 3.0;
-                        const SHORT_LABEL_THRESHOLD: f32 = 11.0;
+                        const SHORT_LABEL_THRESHOLD: f32 = 8.0;
                         const FULL_LABEL_THRESHOLD: f32 = 18.0;
                         const DURATION_THRESHOLD: f32 = 26.0;
 
@@ -455,8 +455,13 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     target: Some({
                                         rsx! {
                                             div {
-                                                class: "p-2 whitespace-nowrap -ml-1",
-                                                style: format!("min-width: 220px; border-left: 3px solid {};", color),
+                                                class: "p-2 whitespace-nowrap -ml-1 min-w-[220px]",
+
+                                                div {
+                                                    class: "absolute w-[3px] h-[calc(100%-6px)]  left-1 top-1 bottom-1 rounded-md",
+                                                    style: format!("background-color: {};", color),
+
+                                                }
 
                                                 div {
                                                     class: "flex gap-2 items-center overflow-hidden text-ellipsis",
@@ -525,15 +530,8 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                             }
                                             if let Some(label) = label {
                                                 div {
-                                                    class: "whitespace-nowrap absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none select-none",
-                                                    div {
-                                                        class: "flex gap-1 items-center justify-center h-full pointer-events-none",
-                                                        
-                                                        span {
-                                                            class: "truncate whitespace-nowrap font-medium leading-none",
-                                                            "{label}"
-                                                        }
-                                                    }
+                                                    class: "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex gap-1 items-center justify-center h-full pointer-events-none truncate whitespace-nowrap font-medium leading-none pointer-events-none select-none h-full",
+                                                    "{label}"
                                                 }
                                             }
                                             div {

@@ -1,5 +1,5 @@
 [package]
-name = "spec"
+name = "spexe"
 version = "0.1.0"
 authors = ["Maksim Ivanov <yura22875@yandex.ru>"]
 edition = "2021"

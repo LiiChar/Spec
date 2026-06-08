@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::core::{EventModel, EventType};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AppStat {
     pub name: String,
     pub active_time: u64,
@@ -14,7 +14,7 @@ pub struct AppStat {
     pub event: EventModel
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EventTypeStat {
     pub event_type: EventType,
     pub count: usize,
@@ -22,7 +22,7 @@ pub struct EventTypeStat {
     pub percent: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EventStats {
     pub total_time: u64,
     pub active_time: u64,

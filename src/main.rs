@@ -65,7 +65,7 @@ fn main() {
         println!("Debug starting application with args: {:?}", args);
     } else {
         if settings.auto_start_tracking {
-            let builder = Builder::new().app_name("Spec").arg("--autostart").arg("--hidden");
+            let builder = Builder::new().app_name("Spexe").arg("--autostart").arg("--hidden");
             let autolaunch = builder.build().unwrap();
             autolaunch.enable().unwrap();
         }

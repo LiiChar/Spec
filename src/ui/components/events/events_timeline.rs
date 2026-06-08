@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::LdArrowUpToLine;
+use dioxus_free_icons::icons::ld_icons::{LdArrowUpToLine, LdBarChart, LdX, LdArrowDownToLine };
 use dioxus_free_icons::Icon;
 
+use crate::ui::{Button, ButtonSize};
 use crate::{
     core::{EventModel, EventType, JobModel},
     lib::{CronExpr, color::foreground_color, convert_ts_to_local_date, merge_events},
-    ui::{EventElement, job_modal::JobModal, use_settings},
+    ui::{EventElement, job_modal::JobModal, use_settings, stats_modal::StatsModal},
 };
 
 #[derive(PartialEq, Clone, Copy)]
@@ -187,31 +188,89 @@ fn group_by_segments(events: &[EventModel]) -> Vec<Segment> {
     segments
 }
 
-fn y_to_timestamp(y: f64, selected_hour: Option<u32>, day_start: u64) -> u64 {
+
+fn y_to_timestamp(
+    y: f64,
+    segments: &[Segment],
+    selected_hour: Option<u32>,
+    day_start: u64,
+) -> u64 {
     let base = 80.0;
     let expanded = 800.0;
 
     let mut acc = 0.0;
 
-    for hour in 0..24 {
-        let h_size = if selected_hour == Some(hour) {
-            expanded
+    for seg in segments {
+        let size = if seg.has_events {
+            match selected_hour {
+                Some(hour)
+                    if hour >= seg.start && hour <= seg.end =>
+                {
+                    expanded
+                }
+                _ => base,
+            }
         } else {
             base
         };
 
-        if y <= acc + h_size {
-            let inside = (y - acc) / h_size;
+        if y < acc + size {
+            let progress = (y - acc) / size;
 
-            let ms_in_hour = (inside * 3_600_000.0) as u64;
+            let start_ts =
+                day_start + seg.start as u64 * 3_600_000;
 
-            return day_start + hour as u64 * 3_600_000 + ms_in_hour;
+            let end_ts =
+                day_start + (seg.end as u64 + 1) * 3_600_000;
+
+            let segment_duration = end_ts - start_ts;
+
+            return start_ts
+                + (progress * segment_duration as f64) as u64;
         }
 
-        acc += h_size;
+        acc += size;
     }
 
     day_start + 86_400_000
+}
+
+fn timestamp_to_y(
+    ts: u64,
+    selected_hour: Option<u32>,
+    day_start: u64,
+) -> f64 {
+    let base = 80.0;
+    let expanded = 800.0;
+
+    let mut y = 0.0;
+
+    let diff = ts.saturating_sub(day_start);
+
+    let hour = (diff / 3_600_000) as u32;
+    let ms_in_hour = diff % 3_600_000;
+
+    for h in 0..hour {
+        y += if selected_hour == Some(h) {
+            expanded
+        } else {
+            base
+        };
+    }
+
+    let hour_size = if selected_hour == Some(hour) {
+        expanded
+    } else {
+        base
+    };
+
+    y + hour_size * (ms_in_hour as f64 / 3_600_000.0)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct DragState {
+    start_y: f64,
+    rect_top: f64,
 }
 
 #[component]
@@ -259,9 +318,75 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
             .collect::<Vec<_>>()
     });
 
+    let mut node_element = use_signal(|| None);
+
+    let mut drag_state = use_signal(|| None::<DragState>);
+    let mut moved = use_signal(|| false);
+
+    let mut selected_start_position =
+        use_signal(|| None::<f64>);
+
+    let mut selected_end_position =
+        use_signal(|| None::<f64>);
+
+    let mut selected_events = use_signal(|| Vec::new());
+
+    let mut visible_stats = use_signal(|| false);
+
+    fn start_selection(
+        y: f64,
+        rect_top: f64,
+        drag_state: &mut Signal<Option<DragState>>,
+        moved: &mut Signal<bool>,
+        start: &mut Signal<Option<f64>>,
+        end: &mut Signal<Option<f64>>,
+    ) {
+        drag_state.set(Some(DragState {
+            start_y: y,
+            rect_top,
+        }));
+
+        moved.set(false);
+
+        start.set(Some(y));
+        end.set(Some(y));
+    }
+
+    fn update_selection(
+        mouse_y: f64,
+        drag_state: DragState,
+        moved: &mut Signal<bool>,
+        start: &mut Signal<Option<f64>>,
+        end: &mut Signal<Option<f64>>,
+    ) {
+        let y = mouse_y - drag_state.rect_top;
+
+        if (y - drag_state.start_y).abs() > 5.0 {
+            moved.set(true);
+        }
+
+        start.set(Some(
+            drag_state.start_y.min(y)
+        ));
+
+        end.set(Some(
+            drag_state.start_y.max(y)
+        ));
+    }
+
+    fn finish_selection(
+        drag_state: &mut Signal<Option<DragState>>,
+    ) {
+        drag_state.set(None);
+    }
 
 
     rsx! {
+        StatsModal {
+            visible: visible_stats,
+            on_close: move |_| visible_stats.set(false),
+            events: selected_events().clone(),
+        }
         JobModal {
             job: selected_job.read().clone(),
             on_close: move |_| selected_job.set(None),
@@ -274,29 +399,172 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                     TimelineOrientation::Vertical => "flex-col",
                 },
             ),
-            div {
-                tabindex: 0,
-                onkeydown: move |evt| {
-                    match evt.key() {
-                        Key::Home => {
-                            evt.prevent_default();
-                            selected_hour.set(Some(0));
+            onmounted: move |cx| {
+                node_element.set(Some(cx.data()));
+            },
+
+            onpointerdown: move |evt| {
+                evt.stop_propagation();
+                let node = node_element.read().clone();
+
+                spawn(async move {
+                    if let Some(node) = node {
+                        if let Ok(rect) = node.get_client_rect().await {
+                            let y =
+                                evt.client_coordinates().y as f64
+                                - rect.origin.y;
+
+                            start_selection(
+                                y,
+                                rect.origin.y,
+                                &mut drag_state,
+                                &mut moved,
+                                &mut selected_start_position,
+                                &mut selected_end_position,
+                            );
                         }
-                        Key::End => {
-                            evt.prevent_default();
-                            selected_hour.set(Some(23));
-                        }
-                        Key::Escape => {
-                            evt.prevent_default();
-                            selected_hour.set(None);
-                        }
-                        _ => {}
                     }
-                },
-                onclick: move |_| {},
-                class: "absolute inset-0",
-                role: "application",
-                aria_label: "Таймлайн активности. Используйте стрелки вверх/вниз или k/j для навигации по часам",
+                });
+            },
+
+            onpointermove: move |evt| {
+                let Some(state) = *drag_state.read() else {
+                    return;
+                };
+
+                update_selection(
+                    evt.client_coordinates().y as f64,
+                    state,
+                    &mut moved,
+                    &mut selected_start_position,
+                    &mut selected_end_position,
+                );
+            },
+
+            onpointerup: move |_| {
+                finish_selection(&mut drag_state);
+
+                let Some(start_y) = *selected_start_position.read() else {
+                    return;
+                };
+
+                let Some(end_y) = *selected_end_position.read() else {
+                    return;
+                };
+
+                let day_start = props
+                    .day
+                    .read()
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Local)
+                    .unwrap()
+                    .timestamp_millis() as u64;
+
+                let start_ts =
+                    y_to_timestamp(start_y, &day_events.read(), selected_hour(), day_start);
+
+                let end_ts =
+                    y_to_timestamp(end_y, &day_events.read(), selected_hour(), day_start);
+
+                let selection_start = start_ts.min(end_ts);
+                let selection_end = start_ts.max(end_ts);
+
+                let mut s_events = Vec::new();
+
+                for event in props.events.read().iter() {
+                    let event_start = event.timestamp;
+                    let event_end = event.timestamp + event.duration;
+
+                    let intersects =
+                        event_start < selection_end &&
+                        event_end > selection_start;
+
+                    if intersects {
+                        s_events.push(event.clone());
+                    }
+                }
+
+                s_events.sort_by_key(|e| e.timestamp);
+
+                selected_events.set(s_events.clone());
+
+
+                println!(
+                    "Selected: {}",
+                    s_events
+                        .iter()
+                        .filter_map(|e| {
+                            e.window
+                                .as_ref()
+                                .map(|w| w.title.clone())
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+
+                if selected_start_position().unwrap_or(0.0) == selected_end_position().unwrap_or(0.0) {
+                    selected_start_position.set(None);
+                    selected_end_position.set(None);
+                }
+
+            },
+            {
+                let start = selected_start_position().unwrap_or(0.0);
+                let end = selected_end_position().unwrap_or(0.0);
+
+                let top = start.min(end);
+                let height = (end - start).abs();
+
+                rsx! {
+                   div {
+                        class: "absolute w-full left-0 bg-primary/20 z-50",
+                        style: format!(
+                            "top:{}px;height:{}px;",
+                            top,
+                            height
+                        ),
+                        if drag_state().is_none() && selected_start_position().is_some() && selected_end_position().is_some() {
+                            div {
+                                class: "absolute right-1 top-1 flex gap-0.5 text-sm",
+                                button {
+                                    class: "p-0.5! glass rounded-full",
+                                    onpointerdown: move |evt| {
+                                        evt.stop_propagation();
+                                    },
+                                    onclick: move |evt: Event<MouseData>| {
+                                        evt.stop_propagation();
+                                        evt.prevent_default();
+                                        visible_stats.set(true);
+                                    },
+                                    Icon {
+                                        icon: LdBarChart,
+                                        width: 12,
+                                        height: 12
+                                    }
+                                }
+                                button {
+                                    class: "p-0.5! glass rounded-full",
+                                    onpointerdown: move |evt| {
+                                        evt.stop_propagation();
+                                    },
+                                    onclick: move |evt: Event<MouseData>| {
+                                        evt.stop_propagation();
+                                        evt.prevent_default();
+                                        selected_start_position.set(None);
+                                        selected_end_position.set(None);
+                                    },
+                                    Icon {
+                                        icon: LdX,
+                                        width: 12,
+                                        height: 12
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             {
                 day_events
@@ -359,7 +627,6 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                             div {
                                 key: "{start_hour}-{end_hour}", 
                                 class: format!("relative border-dashed border-border/10 border-b-[1px] last:border-b-0"),
-                                onclick: move |_| selected_hour.set(Some(start_hour)),
 
                                 style: format!("height: {}px;", height as i32),
 
@@ -376,24 +643,33 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                     is_selected: is_selected.clone(),
                                 }
 
-                                if is_selected {
-                                    button {
+                                if hour_count > 1 {
+                                    div { class: "absolute z-1 left-2 top-1 text-xs opacity-60 pointer-events-none select-none", "{start_hour}:00-{end_hour}:00"
+                                 }
+                                } else {
+                                    div { 
                                         onclick: move |evt| {
                                             evt.stop_propagation();
-                                            selected_hour.set(None);
+                                            let current_hour = selected_hour();
+                                            if current_hour.is_some() {
+                                                selected_hour.set(None);
+                                            } else {
+                                                selected_hour.set(Some(start_hour));
+                                            }
                                         },
-                                        class: "absolute z-10  rounded-md p-1 right-1 top-1 glass text-xs opacity-60 cursor-pointer",
-                                        Icon { icon: LdArrowUpToLine, height: 12, width: 12 }
+                                        class: format!("absolute z-1 left-{} top-1 text-xs opacity-60 select-none flex gap-1 cursor-pointer", 
+                                        if is_selected { "2" } else { "1" }), 
+                                        "{start_hour}:00",
+                                        if is_selected {
+                                            button {
+                                                Icon { icon: LdArrowUpToLine, height: 10, width: 10 }
+                                            }
+                                        } else {
+                                            button {
+                                                Icon { icon: LdArrowDownToLine, height: 10, width: 10 }
+                                            }
+                                        }
                                     }
-                                }
-
-
-
-                                // подпись диапазона (если сегмент > 1 часа)
-                                if hour_count > 1 {
-                                    div { class: "absolute z-2 left-2 top-1 text-xs opacity-60", "{start_hour}:00-{end_hour}:00" }
-                                } else {
-                                    div { class: format!("absolute z-2 left-{} top-1 text-xs opacity-60", if is_selected { "2" } else { "1" }), "{start_hour}:00" }
                                 }
 
                                 div {
@@ -407,7 +683,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                 if is_selected {
                                     {(1..6).map(|i| {
                                         rsx! {
-                                            div { class: "absolute left-2 z-40 text-xs opacity-60 pointer-events-none", style: format!("top: calc(100%/6*{})", i), {format!("{}:{}",start_hour, 60 / 6 * i)} }
+                                            div { class: "absolute left-2 z-40 text-xs opacity-60 pointer-events-none select-none z-1", style: format!("top: calc(100%/6*{})", i), {format!("{}:{}",start_hour, 60 / 6 * i)} }
                                         }
                                     })}
                                 }
@@ -415,9 +691,6 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                         }
                     })
             }
-
-            
         }
-
     }
 }

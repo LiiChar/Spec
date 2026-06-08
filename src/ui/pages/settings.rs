@@ -47,15 +47,15 @@ fn import_data_from_json(raw: &str) -> Result<(usize, usize, usize), String> {
 
 fn pick_import_file() -> Option<PathBuf> {
     rfd::FileDialog::new()
-        .set_title("Import Spec data")
+        .set_title("Import Spexe data")
         .add_filter("JSON", &["json"])
         .pick_file()
 }
 
 fn pick_export_file() -> Option<PathBuf> {
     rfd::FileDialog::new()
-        .set_title("Export Spec data")
-        .set_file_name("spec-data.json")
+        .set_title("Export Spexe data")
+        .set_file_name("spexe-data.json")
         .add_filter("JSON", &["json"])
         .save_file()
 }

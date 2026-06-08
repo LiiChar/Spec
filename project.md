@@ -1,8 +1,8 @@
-# Проект Spec
+# Проект Spexe
 
 ## Что это за проект
 
-`Spec` — это desktop-приложение на `Rust` и `Dioxus 0.7.1`, которое отслеживает активность пользователя в Windows:
+`Spexe` — это desktop-приложение на `Rust` и `Dioxus 0.7.1`, которое отслеживает активность пользователя в Windows:
 
 - определяет текущее активное окно
 - фиксирует смену окна или состояние простоя
@@ -26,11 +26,11 @@
 
 ### Корневые файлы
 
-- [Cargo.toml](E:/code/pet-project/Spec/Cargo.toml:1) — зависимости, фичи и платформа запуска
-- [src/main.rs](E:/code/pet-project/Spec/src/main.rs:1) — точка входа приложения
-- [src/config.rs](E:/code/pet-project/Spec/src/config.rs:1) — общие константы, сейчас путь к БД
-- [windows.db](E:/code/pet-project/Spec/windows.db:1) — локальная база с историей событий
-- [assets/main.css](E:/code/pet-project/Spec/assets/main.css:1), [tailwind.css](E:/code/pet-project/Spec/tailwind.css:1) — стили
+- [Cargo.toml](E:/code/pet-project/Spexe/Cargo.toml:1) — зависимости, фичи и платформа запуска
+- [src/main.rs](E:/code/pet-project/Spexe/src/main.rs:1) — точка входа приложения
+- [src/config.rs](E:/code/pet-project/Spexe/src/config.rs:1) — общие константы, сейчас путь к БД
+- [windows.db](E:/code/pet-project/Spexe/windows.db:1) — локальная база с историей событий
+- [assets/main.css](E:/code/pet-project/Spexe/assets/main.css:1), [tailwind.css](E:/code/pet-project/Spexe/tailwind.css:1) — стили
 
 ---
 
@@ -38,7 +38,7 @@
 
 При запуске приложение проходит такой путь:
 
-1. В [src/main.rs](E:/code/pet-project/Spec/src/main.rs:1) создаются три канала:
+1. В [src/main.rs](E:/code/pet-project/Spexe/src/main.rs:1) создаются три канала:
    - один для общего потока событий
    - один для записи в базу
    - один для обновления интерфейса
@@ -63,7 +63,7 @@
 
 ## 1. Точка входа
 
-Файл: [src/main.rs](E:/code/pet-project/Spec/src/main.rs:1)
+Файл: [src/main.rs](E:/code/pet-project/Spexe/src/main.rs:1)
 
 Это главный orchestration-файл проекта. Он не содержит бизнес-логику трекинга или UI-логики, а связывает все части системы.
 
@@ -83,8 +83,8 @@
 
 Файлы:
 
-- [src/core/model/events.rs](E:/code/pet-project/Spec/src/core/model/events.rs:1)
-- [src/core/model/window.rs](E:/code/pet-project/Spec/src/core/model/window.rs:1)
+- [src/core/model/events.rs](E:/code/pet-project/Spexe/src/core/model/events.rs:1)
+- [src/core/model/window.rs](E:/code/pet-project/Spexe/src/core/model/window.rs:1)
 
 Это базовые структуры данных, вокруг которых строится весь проект.
 
@@ -129,7 +129,7 @@
 
 ## 3. Получение активного окна
 
-Файл: [src/core/window/window.rs](E:/code/pet-project/Spec/src/core/window/window.rs:1)
+Файл: [src/core/window/window.rs](E:/code/pet-project/Spexe/src/core/window/window.rs:1)
 
 Этот модуль работает напрямую с `Windows API`.
 
@@ -150,7 +150,7 @@
 
 ## 4. Трекинг активности
 
-Файл: [src/core/tracker/tracker.rs](E:/code/pet-project/Spec/src/core/tracker/tracker.rs:1)
+Файл: [src/core/tracker/tracker.rs](E:/code/pet-project/Spexe/src/core/tracker/tracker.rs:1)
 
 Это главный доменный модуль проекта.
 
@@ -187,7 +187,7 @@
 
 ## 5. База данных
 
-Файл: [src/core/database/database.rs](E:/code/pet-project/Spec/src/core/database/database.rs:1)
+Файл: [src/core/database/database.rs](E:/code/pet-project/Spexe/src/core/database/database.rs:1)
 
 Этот модуль отвечает за хранение истории.
 
@@ -232,7 +232,7 @@
 
 ## 6. UI-слой
 
-UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
+UI находится в папке [src/ui](E:/code/pet-project/Spexe/src/ui:1).
 
 Он делится на несколько уровней:
 
@@ -243,7 +243,7 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ### Корень UI
 
-Файл: [src/ui/app/root.rs](E:/code/pet-project/Spec/src/ui/app/root.rs:1)
+Файл: [src/ui/app/root.rs](E:/code/pet-project/Spexe/src/ui/app/root.rs:1)
 
 `Root` — главный компонент интерфейса.
 
@@ -261,8 +261,8 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 Файлы:
 
-- [src/ui/layout/layout.rs](E:/code/pet-project/Spec/src/ui/layout/layout.rs:1)
-- [src/ui/layout/header.rs](E:/code/pet-project/Spec/src/ui/layout/header.rs:1)
+- [src/ui/layout/layout.rs](E:/code/pet-project/Spexe/src/ui/layout/layout.rs:1)
+- [src/ui/layout/header.rs](E:/code/pet-project/Spexe/src/ui/layout/header.rs:1)
 
 `Layout` задает общую оболочку страницы.
 
@@ -275,7 +275,7 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ### Главный экран событий
 
-Файл: [src/ui/widget/events/Events.rs](E:/code/pet-project/Spec/src/ui/widget/events/Events.rs:1)
+Файл: [src/ui/widget/events/Events.rs](E:/code/pet-project/Spexe/src/ui/widget/events/Events.rs:1)
 
 Это центральный экран проекта.
 
@@ -294,7 +294,7 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ### Таймлайн
 
-Файл: [src/ui/components/events/EvensTimeline.rs](E:/code/pet-project/Spec/src/ui/components/events/EvensTimeline.rs:1)
+Файл: [src/ui/components/events/EvensTimeline.rs](E:/code/pet-project/Spexe/src/ui/components/events/EvensTimeline.rs:1)
 
 Этот компонент:
 
@@ -307,7 +307,7 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ### Один блок таймлайна
 
-Файл: [src/ui/components/events/EventElement.rs](E:/code/pet-project/Spec/src/ui/components/events/EventElement.rs:1)
+Файл: [src/ui/components/events/EventElement.rs](E:/code/pet-project/Spexe/src/ui/components/events/EventElement.rs:1)
 
 Этот компонент отвечает за отрисовку событий внутри одного часового интервала.
 
@@ -324,7 +324,7 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ### Список событий
 
-Файл: [src/ui/components/events/EventsList.rs](E:/code/pet-project/Spec/src/ui/components/events/EventsList.rs:1)
+Файл: [src/ui/components/events/EventsList.rs](E:/code/pet-project/Spexe/src/ui/components/events/EventsList.rs:1)
 
 Этот компонент показывает ту же историю не как временную шкалу, а как список карточек.
 
@@ -340,7 +340,7 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ### Недельное представление
 
-Файл: [src/ui/components/events/EvensWeek.rs](E:/code/pet-project/Spec/src/ui/components/events/EvensWeek.rs:1)
+Файл: [src/ui/components/events/EvensWeek.rs](E:/code/pet-project/Spexe/src/ui/components/events/EvensWeek.rs:1)
 
 Это вспомогательный компонент недельной визуализации.
 
@@ -350,13 +350,13 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ## 8. Утилиты
 
-Папка: [src/lib](E:/code/pet-project/Spec/src/lib:1)
+Папка: [src/lib](E:/code/pet-project/Spexe/src/lib:1)
 
 Это слой вспомогательных функций, который разгружает `core` и `ui`.
 
 ### Работа со временем
 
-Файл: [src/lib/time.rs](E:/code/pet-project/Spec/src/lib/time.rs:1)
+Файл: [src/lib/time.rs](E:/code/pet-project/Spexe/src/lib/time.rs:1)
 
 Содержит:
 
@@ -368,7 +368,7 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 ### Работа с событиями
 
-Файл: [src/lib/events.rs](E:/code/pet-project/Spec/src/lib/events.rs:1)
+Файл: [src/lib/events.rs](E:/code/pet-project/Spexe/src/lib/events.rs:1)
 
 Содержит логику `merge_events`.
 
@@ -386,14 +386,14 @@ UI находится в папке [src/ui](E:/code/pet-project/Spec/src/ui:1).
 
 Если нужно быстро понять проект, лучше идти в таком порядке:
 
-1. [Cargo.toml](E:/code/pet-project/Spec/Cargo.toml:1) — понять стек
-2. [src/main.rs](E:/code/pet-project/Spec/src/main.rs:1) — увидеть общую схему работы
-3. [src/core/model/events.rs](E:/code/pet-project/Spec/src/core/model/events.rs:1) и [src/core/model/window.rs](E:/code/pet-project/Spec/src/core/model/window.rs:1) — понять модели данных
-4. [src/core/tracker/tracker.rs](E:/code/pet-project/Spec/src/core/tracker/tracker.rs:1) — понять, как рождаются события
-5. [src/core/database/database.rs](E:/code/pet-project/Spec/src/core/database/database.rs:1) — понять, как события сохраняются
-6. [src/ui/app/root.rs](E:/code/pet-project/Spec/src/ui/app/root.rs:1) — понять, как UI получает данные
-7. [src/ui/widget/events/Events.rs](E:/code/pet-project/Spec/src/ui/widget/events/Events.rs:1) — понять, как устроен экран
-8. [src/ui/components/events/EventElement.rs](E:/code/pet-project/Spec/src/ui/components/events/EventElement.rs:1) и [src/ui/components/events/EventsList.rs](E:/code/pet-project/Spec/src/ui/components/events/EventsList.rs:1) — понять конечное отображение
+1. [Cargo.toml](E:/code/pet-project/Spexe/Cargo.toml:1) — понять стек
+2. [src/main.rs](E:/code/pet-project/Spexe/src/main.rs:1) — увидеть общую схему работы
+3. [src/core/model/events.rs](E:/code/pet-project/Spexe/src/core/model/events.rs:1) и [src/core/model/window.rs](E:/code/pet-project/Spexe/src/core/model/window.rs:1) — понять модели данных
+4. [src/core/tracker/tracker.rs](E:/code/pet-project/Spexe/src/core/tracker/tracker.rs:1) — понять, как рождаются события
+5. [src/core/database/database.rs](E:/code/pet-project/Spexe/src/core/database/database.rs:1) — понять, как события сохраняются
+6. [src/ui/app/root.rs](E:/code/pet-project/Spexe/src/ui/app/root.rs:1) — понять, как UI получает данные
+7. [src/ui/widget/events/Events.rs](E:/code/pet-project/Spexe/src/ui/widget/events/Events.rs:1) — понять, как устроен экран
+8. [src/ui/components/events/EventElement.rs](E:/code/pet-project/Spexe/src/ui/components/events/EventElement.rs:1) и [src/ui/components/events/EventsList.rs](E:/code/pet-project/Spexe/src/ui/components/events/EventsList.rs:1) — понять конечное отображение
 
 ---
 
