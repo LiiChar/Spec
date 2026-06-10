@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     DB,
-    core::{EventModel, GoalModel, JobModel, TagModel, WindowModel},
+    core::{EventModel, GoalModel, JobModel, TagModel, WindowModel, tag_repo::auto_tag},
     lib::extract_icon_events,
 };
 use super::repositories::{WindowRepository, TagRepository, JobRepository, GoalRepository, EventRepository};
@@ -271,6 +271,11 @@ impl Database {
         )?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    pub fn auto_tag(&self, mut event: EventModel) -> Result<EventModel, String> {
+        let tags = TagRepository::get_all(&self.conn).expect("Failed get all tags");
+        auto_tag(&self.conn, &tags, event)
     }
 }
 

@@ -270,12 +270,11 @@ pub fn StatisticsPage() -> Element {
     };
 
     rsx! {
-        if tag_modal_visible() {
+        div { class: "mx-auto flex w-full max-w-7xl flex-col gap-4 p-2 pb-20",
             TagModal {
+                visible: tag_modal_visible.clone(),
                 on_close: move |_| tag_modal_visible.set(false),
             }
-        }
-        div { class: "mx-auto flex w-full max-w-7xl flex-col gap-4 p-2 pb-20",
             div { class: "flex flex-col gap-1",
                 h1 { class: "text-xl font-semibold text-foreground",
                     "Статистика использования"

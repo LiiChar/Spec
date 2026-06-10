@@ -55,7 +55,7 @@ fn pick_import_file() -> Option<PathBuf> {
 fn pick_export_file() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .set_title("Export Spexe data")
-        .set_file_name("spexe-data.json")
+        .set_file_name("spec-data.json")
         .add_filter("JSON", &["json"])
         .save_file()
 }
@@ -126,6 +126,50 @@ pub fn SettingsPage() -> Element {
                         }
                     }
 
+                    label { class: "flex flex-col gap-2 text-sm text-foreground/70",
+                        "Тип отображения названий событий"
+                        {
+                            let st = settings_rc.clone();
+                            rsx! {
+                                Select {
+                                    onchange: move |value: String| {
+                                        let mut c = (*st).clone();
+                                        c.set_type_label(value);
+                                    },
+                                    value: "{settings.type_label}",
+                                    SelectTrigger {}
+                                    SelectContent {
+                                        SelectItem { value: "full", title: "С иконкой и загаловком", "С иконкой и загаловком" }
+                                        SelectItem { value: "text", title: "Без иконки", "Без иконки" }
+                                        SelectItem { value: "title", title: "Только заголовок", "Только заголовок" }
+                                        SelectItem { value: "label", title: "Только название приложения", "Только название приложения" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    label { class: "flex flex-col gap-2 text-sm text-foreground/70",
+                        "Тип отображения тегов"
+                        {
+                            let st = settings_rc.clone();
+                            rsx! {
+                                Select {
+                                    onchange: move |value: String| {
+                                        let mut c = (*st).clone();
+                                        c.set_type_tags(value);
+                                    },
+                                    value: "{settings.type_tags}",
+                                    SelectTrigger {}
+                                    SelectContent {
+                                        SelectItem { value: "сircle", title: "Круги", "Круги" }
+                                        SelectItem { value: "rectangle", title: "Столбцы", "Столбцы" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     SettingsSwitch {
                         title: "Компактная таймлиния".to_string(),
                         hint: "Уплотняет отображение коротких событий."
@@ -166,6 +210,51 @@ pub fn SettingsPage() -> Element {
                                 let mut c = (*st).clone();
                                 let v = !c.settings.read().auto_start_tracking;
                                 c.set_auto_start_tracking(v);
+                            }
+                        },
+                    }
+
+                    SettingsSwitch {
+                        title: "Отображать теги".to_string(),
+                        hint: ""
+                            .to_string(),
+                        checked: settings.show_tags,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().show_tags;
+                                c.set_show_tags(v);
+                            }
+                        },
+                    }
+
+                    SettingsSwitch {
+                        title: "Мягкие цвета событий".to_string(),
+                        hint: ""
+                            .to_string(),
+                        checked: settings.soft_event,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().soft_event;
+                                c.set_soft_event(v);
+                            }
+                        },
+                    }
+
+                    SettingsSwitch {
+                        title: "Отображать линию текущего времени".to_string(),
+                        hint: ""
+                            .to_string(),
+                        checked: settings.show_current_time_line,
+                        onclick: {
+                            let st = settings_rc.clone();
+                            move |_| {
+                                let mut c = (*st).clone();
+                                let v = !c.settings.read().show_current_time_line;
+                                c.set_show_current_time_line(v);
                             }
                         },
                     }
@@ -396,7 +485,9 @@ fn SettingsSwitch(
         div { class: "flex items-center justify-between gap-3 rounded-md border border-border/30 p-3",
             div {
                 div { class: "text-sm font-medium text-foreground", "{title}" }
-                div { class: "text-xs text-foreground/55", "{hint}" }
+                if !hint.is_empty() {
+                    div { class: "text-xs text-foreground/55", "{hint}" }
+                }
             }
             Switch { checked, onclick }
         }

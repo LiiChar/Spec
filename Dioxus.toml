@@ -1,11 +1,10 @@
 [application]
 
 
-
 [web.app]
 
 # HTML title tag content
-title = "spexe"
+title = "spec"
 
 # include `assets` in web platform
 [web.resource]
@@ -23,5 +22,5 @@ script = []
 script = []
 
 [bundle]
-identifier = "com.spexe"
-publisher = "spexe"
+identifier = "com.spec"
+publisher = "spec"

@@ -71,6 +71,13 @@ pub struct Settings {
     pub work_end_hour: u32,
     pub show_browser_details: bool,
     pub tag_rules: Vec<TagRule>,
+    pub soft_event: bool,
+    pub show_tags: bool,
+    pub type_tags: String,
+    pub segment_height: u32,
+    pub selected_segment_height: u32,
+    pub show_current_time_line: bool,
+    pub type_label: String,
 }
 
 impl Default for Settings {
@@ -99,6 +106,13 @@ impl Default for Settings {
                 tag: "Browser".to_string(),
                 enabled: true,
             }],
+            soft_event: false,
+            show_tags: true,
+            type_tags: "сircle".to_string(),
+            segment_height: 80,
+            selected_segment_height: 800,
+            show_current_time_line: true,
+            type_label: "full".to_string(),
         }
     }
 }
@@ -193,6 +207,50 @@ impl SettingsState {
 
     pub fn set_tag_rules(&mut self, rules: Vec<TagRule>) {
         self.mutate(|s| s.tag_rules = rules);
+    }
+
+    pub fn set_event_duration(&mut self, v: u32) {
+        self.mutate(|s| s.event_duration = v);
+    }
+
+    pub fn set_idle_threshold(&mut self, v: u32) {
+        self.mutate(|s| s.idle_threshold = v);
+    }
+
+    pub fn set_soft_event(&mut self, v: bool) {
+        self.mutate(|s| s.soft_event = v);
+    }
+
+    pub fn set_show_tags(&mut self, v: bool) {
+        self.mutate(|s| s.show_tags = v);
+    }
+
+    pub fn set_type_tags<S: Into<String>>(&mut self, v: S) {
+        self.mutate(|s| s.type_tags = v.into());
+    }
+
+    pub fn set_segment_height(&mut self, v: u32) {
+        self.mutate(|s| s.segment_height = v);
+    }
+
+    pub fn set_selected_segment_height(&mut self, v: u32) {
+        self.mutate(|s| s.selected_segment_height = v);
+    }
+
+    pub fn set_show_current_time_line(&mut self, v: bool) {
+        self.mutate(|s| s.show_current_time_line = v);
+    }
+
+    pub fn set_type_label<S: Into<String>>(&mut self, v: S) {
+        self.mutate(|s| s.type_label = v.into());
+    }
+
+    pub fn set_work_start_hour(&mut self, hour: u32) {
+        self.mutate(|s| s.work_start_hour = hour.min(23));
+    }
+
+    pub fn set_work_end_hour(&mut self, hour: u32) {
+        self.mutate(|s| s.work_end_hour = hour.min(23));
     }
 }
 

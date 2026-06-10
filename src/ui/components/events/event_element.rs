@@ -6,8 +6,8 @@ use palette::{Srgba, WithAlpha};
 
 use crate::{
     core::{EventModel, EventType, JobModel, TagModel, with_database},
-    lib::{CronExpr, color::{foreground_color, idle_color, set_alpha, soften_color}, convert_ts_to_local_date, format_duration_short, get_process_color},
-    ui::{TimelineOrientation, Tooltip, TooltipAlign, app},
+    lib::{CronExpr, color::{foreground_color, icon_bg_color, idle_color, set_alpha, soften_color}, convert_ts_to_local_date, format_duration_short, get_process_color},
+    ui::{TimelineOrientation, tooltip::Tooltip, tooltip::TooltipAlign, app, use_settings},
 };
 
 #[derive(Props, PartialEq, Clone)]
@@ -110,6 +110,10 @@ fn compute_event_lanes(
 
 #[component]
 pub fn EventElement(props: EventsElementProps) -> Element {
+    let settings = use_settings();
+
+
+
     let mut jobs = props.jobs;
     let orientation = props.orientation;
 
@@ -362,31 +366,35 @@ pub fn EventElement(props: EventsElementProps) -> Element {
 
                         let mut evt_color = soften_color(&color, 0.4);
 
-                        let mut evt_color = color.clone();
+                        if !settings.settings.read().soft_event {
+                            evt_color = color.clone();
+                        }
+
                         if is_idle {
                             evt_color = idle_color(&evt_color);
                         }
 
-                        
-                        
+                        let icon_bg_color = icon_bg_color(&evt_color);
 
                         let track_px = match props.orientation {
                             TimelineOrientation::Vertical => {
-                                if props.is_selected { 800.0 } else { 80.0 }
+                                if props.is_selected { settings.settings.read().selected_segment_height as f32 } else { settings.settings.read().segment_height as f32 }
                             }
                             TimelineOrientation::Horizontal => {
-                                if props.is_selected { 800.0 } else { 80.0 }
+                                if props.is_selected { settings.settings.read().selected_segment_height as f32 } else { settings.settings.read().segment_height as f32 }
                             }
                         };
 
                         let event_px = (size / 100.0) * track_px;
 
                         const DOT_THRESHOLD: f32 = 3.0;
-                        const SHORT_LABEL_THRESHOLD: f32 = 8.0;
+                        const DOT_THRESHOLD_ICON: f32 = 30.0;
+                        const SHORT_LABEL_THRESHOLD: f32 = 10.0;
                         const FULL_LABEL_THRESHOLD: f32 = 18.0;
                         const DURATION_THRESHOLD: f32 = 26.0;
 
                         let is_micro = event_px < DOT_THRESHOLD;
+                        let is_micro_icon = event_px >= DOT_THRESHOLD_ICON;
 
                         let label = if event_px >= FULL_LABEL_THRESHOLD {
                             Some(process_name.clone())
@@ -458,7 +466,18 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                                 class: "p-2 whitespace-nowrap -ml-1 min-w-[220px]",
 
                                                 div {
-                                                    class: "absolute w-[3px] h-[calc(100%-6px)]  left-1 top-1 bottom-1 rounded-md",
+                                                    class: "absolute w-[7px] h-[7px] top-1 right-1 rounded-full",
+                                                    style: format!("background-color: {};", 
+                                                        if is_idle {
+                                                            "rgb(91, 98, 108)"
+                                                        } else {
+                                                            "var(--primary)"
+                                                        }
+                                                    ),
+                                                }
+
+                                                div {
+                                                    class: "absolute w-[3px] h-[calc(100%-8px)]  left-1 top-1 bottom-1 rounded-md",
                                                     style: format!("background-color: {};", color),
 
                                                 }
@@ -482,12 +501,6 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                                 div {
                                                     class: "text-muted-foreground/60 text-xs text-foreground/55 overflow-hidden text-ellipsis flex gap-1",
                                                     span { "{process_name}" }
-                                                    span { "-" }
-                                                    if is_idle {
-                                                        span { "idle" }
-                                                    } else {
-                                                        span { "active" }
-                                                    }
                                                 }
 
                                                 div {
@@ -505,33 +518,113 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     div {
                                         div {
                                             class: format!("text-[10px] {}", foreground_color(&color, "text-background".to_owned(), "text-foreground".to_owned())),
-                                            div {
-                                                 class: "absolute left-10 top-1/2 -translate-y-1/2 h-full py-1 flex items-center justify-center",
-                                                {
-                                                    let tags = event.window.as_ref().map(|w| w.tags.clone()).unwrap_or_default();
-                                                    rsx! {
-                                                        div { 
-                                                            class: "flex gap-0.5 h-full relative z-1",
-                                                            for tag in tags {
-                                                                Tooltip {
-                                                                    align: TooltipAlign::Right,
-                                                                    text: "{tag.name}",
-                                                                    at_cursor: true,
-                                                                    gap: 2,
-                                                                    div {
-                                                                        class: "w-[5px] h-full rounded-md",
-                                                                        style: format!("background-color: {}; height: {}", tag.color, if props.is_selected { "100%" } else { "0px" }),
+                                            if settings.settings.read().show_tags {
+                                                if settings.settings.read().type_tags != "сircle" {
+                                                    div {
+                                                        class: "absolute left-10 top-1/2 -translate-y-1/2 h-full py-1 flex items-center justify-center",
+                                                        {
+                                                            let tags = event.window.as_ref().map(|w| w.tags.clone()).unwrap_or_default();
+                                                            rsx! {
+                                                                div { 
+                                                                    class: "flex gap-0.5 h-full relative z-1",
+                                                                    for tag in tags {
+                                                                        Tooltip {
+                                                                            align: TooltipAlign::Right,
+                                                                            text: "{tag.name}",
+                                                                            gap: 2,
+                                                                            div {
+                                                                                class: "w-[5px] h-full rounded-md",
+                                                                                style: format!("background-color: {}; height: {}", tag.color, if props.is_selected { "100%" } else { "0px" }),
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+ 
+                                                   div {
+                                                        class: "absolute left-10 top-1/2 -translate-y-1/2 h-full py-1 flex items-center justify-center",
+                                                        {
+                                                            let tags = event.window.as_ref().map(|w| w.tags.clone()).unwrap_or_default();
+                                                            rsx! {
+                                                                div { 
+                                                                    class: "flex gap-0.5 relative z-1 justify-center items-center",
+                                                                    for tag in tags {
+                                                                        Tooltip {
+                                                                            align: TooltipAlign::Right,
+                                                                            text: "{tag.name}",
+                                                                            div {
+                                                                                class: "w-[6px] rounded-full",
+                                                                                style: format!("background-color: {}; height: {}", tag.color, if props.is_selected { "6px" } else { "0px" }),
+                                                                            }
+                                                                        }
                                                                     }
                                                                 }
                                                             }
                                                         }
                                                     }
                                                 }
+
                                             }
-                                            if let Some(label) = label {
-                                                div {
-                                                    class: "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex gap-1 items-center justify-center h-full pointer-events-none truncate whitespace-nowrap font-medium leading-none pointer-events-none select-none h-full",
-                                                    "{label}"
+
+                                            {
+                                                let display_mode = &settings.settings.read().type_label;
+
+
+                                                let show_icon = matches!(display_mode.as_str(), "full");
+                                                let show_title = matches!(display_mode.as_str(), "full" | "title");
+                                                let show_label = matches!(display_mode.as_str(), "full" | "text" | "label");
+
+                                                rsx! {   
+                                                    if let Some(label) = label {
+                                                        div {
+                                                            class: "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex gap-1 items-center justify-center h-full pointer-events-none truncate whitespace-nowrap font-medium leading-none select-none",
+
+                                                            div {
+                                                                class: "flex gap-1 justify-center items-center",
+
+                                                                if show_icon && is_micro_icon {
+                                                                    if let Some(window) = event.window.clone() {
+                                                                        if let Some(icon) = window.icon_base64 {
+                                                                            div {
+                                                                                class: "rounded-lg p-1",
+                                                                                style: format!("background-color: {};", icon_bg_color),
+                                                                                img {
+                                                                                    class: "w-5 h-5 rounded",
+                                                                                    src: icon
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+
+
+                                                                div {
+                                                                    class: "flex flex-col",
+
+                                                                    if show_title && (is_micro_icon || !show_label) {
+                                                                        div {
+                                                                            class: "text-sm font-bold",
+                                                                            "{window_title}"
+                                                                        }
+                                                                    }
+
+                                                                    if show_label && (is_micro_icon || !show_title || show_label) {
+                                                                        div {
+                                                                            class: if show_title {
+                                                                                "opacity-70 -mt-1"
+                                                                            } else {
+                                                                                ""
+                                                                            },
+                                                                            "{label}"
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                             div {

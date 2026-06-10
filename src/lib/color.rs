@@ -111,3 +111,36 @@ pub fn foreground_color(color: &str, light: String, dark: String) -> String {
         dark    
     }
 }
+
+pub fn adjust_brightness(color: &str, factor: f32) -> String {
+    let (r, g, b, a) = parse_rgba(color).unwrap_or((0.0, 0.0, 0.0, 1.0));
+    let rgb = Srgb::new(r, g, b);
+    let mut hsv: Hsv = rgb.into_color();
+
+    hsv.value = (hsv.value * factor).clamp(0.0, 1.0);
+
+    let rgb2: Srgb = hsv.into_color();
+    format!(
+        "rgba({}, {}, {}, {})",
+        (rgb2.red * 255.0) as u8,
+        (rgb2.green * 255.0) as u8,
+        (rgb2.blue * 255.0) as u8,
+        a
+    )
+}
+
+/// Цвет фона иконки — делаем темнее или светлее в зависимости от яркости базового цвета
+pub fn icon_bg_color(color: &str) -> String {
+    if is_light(color) {
+        // если цвет светлый — затемняем
+        adjust_brightness(color, 0.7)
+    } else {
+        // если тёмный — слегка осветляем
+        adjust_brightness(color, 1.3)
+    }
+}
+
+/// Выбор цвета иконки (на фоне icon_bg_color) — белая или тёмная
+pub fn icon_foreground(color: &str) -> String {
+    foreground_color(&icon_bg_color(color), "#000000".to_string(), "#FFFFFF".to_string())
+}

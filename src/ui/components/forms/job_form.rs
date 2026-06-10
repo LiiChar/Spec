@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 use crate::{
     core::{JobModel, TagModel},
     lib::convert_ts_to_local_date,
-    ui::{Calendar, ColorPicker, TimeInput},
+    ui::{TimeInput, calendar::Calendar, color_picker::ColorPicker, switch::Switch},
 };
 
 #[derive(Props, PartialEq, Clone)]

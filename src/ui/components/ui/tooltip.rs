@@ -4,7 +4,7 @@ use uuid::Uuid;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::time::{sleep, Duration};
 
-const TOOLTIP_HIDE_DELAY: Duration = Duration::from_millis(10);
+const TOOLTIP_HIDE_DELAY: Duration = Duration::from_millis(2);
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TooltipAlign {

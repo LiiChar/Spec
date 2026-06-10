@@ -1,3 +1,4 @@
+use regex::Regex;
 /// Tag Repository
 /// Manages tags and their associations with windows
 
@@ -265,4 +266,46 @@ pub fn attach_tags(
             event
         })
         .collect()
+}
+
+pub fn auto_tag(
+    conn: &Connection,
+    tags: &[TagModel],
+    mut event: EventModel,
+) -> Result<EventModel, String> {
+    let Some(window) = &mut event.window else {
+        return Ok(event);
+    };
+
+    let process_name = window.process_name.as_str();
+
+    for tag in tags {
+        let Some(filter) = &tag.filter else {
+            continue;
+        };
+
+        let regex = Regex::new(filter)
+            .map_err(|e| format!("Invalid regex '{}': {}", filter, e))?;
+
+        if regex.is_match(process_name) {
+            // Не добавляем тег повторно
+            if !window.tags.iter().any(|t| t.id == tag.id) {
+                let exec = conn.execute(
+                    &format!(
+                        "INSERT INTO {} ({}, {}) VALUES (?1, ?2)",
+                        t2w_schema::TABLE,
+                        t2w_schema::COL_TAG_ID,
+                        t2w_schema::COL_PROCESS_NAME
+                    ),
+                    (&tag.id, process_name),
+                );
+                match exec{
+                    Ok(_) => window.tags.push(tag.clone()),
+                    Err(_) => continue,
+                };
+            }
+        }
+    }
+
+    Ok(event)
 }

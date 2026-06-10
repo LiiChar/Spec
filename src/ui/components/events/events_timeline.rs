@@ -4,11 +4,11 @@ use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{LdArrowUpToLine, LdBarChart, LdX, LdArrowDownToLine };
 use dioxus_free_icons::Icon;
+use tokio::time::{Duration as TokioDuration};
 
-use crate::ui::{Button, ButtonSize};
 use crate::{
     core::{EventModel, EventType, JobModel},
-    lib::{CronExpr, color::foreground_color, convert_ts_to_local_date, merge_events},
+    lib::{CronExpr, convert_ts_to_local_date, merge_events},
     ui::{EventElement, job_modal::JobModal, use_settings, stats_modal::StatsModal},
 };
 
@@ -194,11 +194,10 @@ fn y_to_timestamp(
     segments: &[Segment],
     selected_hour: Option<u32>,
     day_start: u64,
+    base: u32,
+    expanded: u32,
 ) -> u64 {
-    let base = 80.0;
-    let expanded = 800.0;
-
-    let mut acc = 0.0;
+    let mut acc: f64 = 0.0;
 
     for seg in segments {
         let size = if seg.has_events {
@@ -206,12 +205,12 @@ fn y_to_timestamp(
                 Some(hour)
                     if hour >= seg.start && hour <= seg.end =>
                 {
-                    expanded
+                    expanded as f64
                 }
-                _ => base,
+                _ => base as f64,
             }
         } else {
-            base
+            base as f64
         };
 
         if y < acc + size {
@@ -237,34 +236,45 @@ fn y_to_timestamp(
 
 fn timestamp_to_y(
     ts: u64,
+    segments: &[Segment],
     selected_hour: Option<u32>,
     day_start: u64,
+    base: u32,
+    expanded: u32,
 ) -> f64 {
-    let base = 80.0;
-    let expanded = 800.0;
-
     let mut y = 0.0;
 
-    let diff = ts.saturating_sub(day_start);
-
-    let hour = (diff / 3_600_000) as u32;
-    let ms_in_hour = diff % 3_600_000;
-
-    for h in 0..hour {
-        y += if selected_hour == Some(h) {
-            expanded
+    for seg in segments {
+        let size = if seg.has_events {
+            match selected_hour {
+                Some(hour)
+                    if hour >= seg.start && hour <= seg.end =>
+                {
+                    expanded as f64
+                }
+                _ => base as f64,
+            }
         } else {
-            base
+            base as f64
         };
+
+        let start_ts =
+            day_start + seg.start as u64 * 3_600_000;
+
+        let end_ts =
+            day_start + (seg.end as u64 + 1) * 3_600_000;
+
+        if ts >= start_ts && ts < end_ts {
+            let progress =
+                (ts - start_ts) as f64 / (end_ts - start_ts) as f64;
+
+            return y + progress * size;
+        }
+
+        y += size;
     }
 
-    let hour_size = if selected_hour == Some(hour) {
-        expanded
-    } else {
-        base
-    };
-
-    y + hour_size * (ms_in_hour as f64 / 3_600_000.0)
+    y
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -330,6 +340,20 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
         use_signal(|| None::<f64>);
 
     let mut selected_events = use_signal(|| Vec::new());
+    
+    let mut current_time = use_signal(|| chrono::Local::now().timestamp_millis());
+
+    use_effect(move || {
+        if !settings.settings.read().show_current_time_line {
+            return;
+        }
+        spawn(async move {
+            loop {
+                current_time.set(chrono::Local::now().timestamp_millis());
+                tokio::time::sleep(TokioDuration::from_millis(1000)).await;
+            }
+        });
+    });
 
     let mut visible_stats = use_signal(|| false);
 
@@ -384,8 +408,35 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
     rsx! {
         StatsModal {
             visible: visible_stats,
-            on_close: move |_| visible_stats.set(false),
+            on_close: move |_| {
+                visible_stats.set(false);
+                selected_start_position.set(None);
+                selected_end_position.set(None);
+            },
             events: selected_events().clone(),
+            start_ts: y_to_timestamp(selected_start_position().unwrap_or(0.0), &day_events.read(), selected_hour(), props
+                    .day
+                    .read()
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Local)
+                    .unwrap()
+                    .timestamp_millis() as u64,
+                    settings.settings.read().segment_height,
+                    settings.settings.read().selected_segment_height,
+                ) as i64,
+            end_ts: y_to_timestamp(selected_end_position().unwrap_or(0.0), &day_events.read(), selected_hour(), props
+                    .day
+                    .read()
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Local)
+                    .unwrap()
+                    .timestamp_millis() as u64,
+                    settings.settings.read().segment_height,
+                    settings.settings.read().selected_segment_height) as i64,
         }
         JobModal {
             job: selected_job.read().clone(),
@@ -463,10 +514,14 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                     .timestamp_millis() as u64;
 
                 let start_ts =
-                    y_to_timestamp(start_y, &day_events.read(), selected_hour(), day_start);
+                    y_to_timestamp(start_y, &day_events.read(), selected_hour(), day_start,
+                    settings.settings.read().segment_height,
+                    settings.settings.read().selected_segment_height);
 
                 let end_ts =
-                    y_to_timestamp(end_y, &day_events.read(), selected_hour(), day_start);
+                    y_to_timestamp(end_y, &day_events.read(), selected_hour(), day_start,
+                    settings.settings.read().segment_height,
+                    settings.settings.read().selected_segment_height);
 
                 let selection_start = start_ts.min(end_ts);
                 let selection_end = start_ts.max(end_ts);
@@ -490,20 +545,6 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
 
                 selected_events.set(s_events.clone());
 
-
-                println!(
-                    "Selected: {}",
-                    s_events
-                        .iter()
-                        .filter_map(|e| {
-                            e.window
-                                .as_ref()
-                                .map(|w| w.title.clone())
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-
                 if selected_start_position().unwrap_or(0.0) == selected_end_position().unwrap_or(0.0) {
                     selected_start_position.set(None);
                     selected_end_position.set(None);
@@ -513,6 +554,29 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
             {
                 let start = selected_start_position().unwrap_or(0.0);
                 let end = selected_end_position().unwrap_or(0.0);
+
+                let day_start = props
+                    .day
+                    .read()
+                    .date_naive()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_local_timezone(Local)
+                    .unwrap()
+                    .timestamp_millis() as u64;
+
+                let start_ts =
+                    y_to_timestamp(start, &day_events.read(), selected_hour(), day_start,
+                    settings.settings.read().segment_height,
+                    settings.settings.read().selected_segment_height);
+
+                let end_ts =
+                    y_to_timestamp(end, &day_events.read(), selected_hour(), day_start,
+                    settings.settings.read().segment_height,
+                    settings.settings.read().selected_segment_height);
+
+                let formated_start = convert_ts_to_local_date(start_ts).format("%H:%M:%S").to_string(); 
+                let formated_end = convert_ts_to_local_date(end_ts).format("%H:%M:%S").to_string();
 
                 let top = start.min(end);
                 let height = (end - start).abs();
@@ -525,44 +589,96 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                             top,
                             height
                         ),
-                        if drag_state().is_none() && selected_start_position().is_some() && selected_end_position().is_some() {
+                        if selected_start_position().is_some() && selected_end_position().is_some() && selected_start_position() != selected_end_position() {
                             div {
                                 class: "absolute right-1 top-1 flex gap-0.5 text-sm",
-                                button {
-                                    class: "p-0.5! glass rounded-full",
-                                    onpointerdown: move |evt| {
-                                        evt.stop_propagation();
-                                    },
-                                    onclick: move |evt: Event<MouseData>| {
-                                        evt.stop_propagation();
-                                        evt.prevent_default();
-                                        visible_stats.set(true);
-                                    },
-                                    Icon {
-                                        icon: LdBarChart,
-                                        width: 12,
-                                        height: 12
+                                if drag_state().is_none() {
+                                    button {
+                                        class: "p-0.5! glass rounded-full",
+                                        onpointerdown: move |evt| {
+                                            evt.stop_propagation();
+                                        },
+                                        onclick: move |evt: Event<MouseData>| {
+                                            evt.stop_propagation();
+                                            evt.prevent_default();
+                                            visible_stats.set(true);
+                                        },
+                                        Icon {
+                                            icon: LdBarChart,
+                                            width: 12,
+                                            height: 12
+                                        }
                                     }
-                                }
-                                button {
-                                    class: "p-0.5! glass rounded-full",
-                                    onpointerdown: move |evt| {
-                                        evt.stop_propagation();
-                                    },
-                                    onclick: move |evt: Event<MouseData>| {
-                                        evt.stop_propagation();
-                                        evt.prevent_default();
-                                        selected_start_position.set(None);
-                                        selected_end_position.set(None);
-                                    },
-                                    Icon {
-                                        icon: LdX,
-                                        width: 12,
-                                        height: 12
+                                    button {
+                                        class: "p-0.5! glass rounded-full",
+                                        onpointerdown: move |evt| {
+                                            evt.stop_propagation();
+                                        },
+                                        onclick: move |evt: Event<MouseData>| {
+                                            evt.stop_propagation();
+                                            evt.prevent_default();
+                                            selected_start_position.set(None);
+                                            selected_end_position.set(None);
+                                        },
+                                        Icon {
+                                            icon: LdX,
+                                            width: 12,
+                                            height: 12
+                                        }
+                                    }
+                                } else {
+                                    div {
+                                        class: "flex gap-1 text-xs opacity-60 pointer-events-none select-none",
+                                        div {
+                                            "{formated_start}"
+                                        }
+                                        div {
+                                         "-"   
+                                        }
+                                        div {
+                                            "{formated_end}"
+                                        }
                                     }
                                 }
                             }
                         }
+                    }
+                }
+            }
+            {
+                if settings.settings.read().show_current_time_line {
+                    let y = timestamp_to_y(current_time() as u64, &day_events.read(), selected_hour(), props
+                        .day
+                        .read()
+                        .date_naive()
+                        .and_hms_opt(0, 0, 0)
+                        .unwrap()
+                        .and_local_timezone(Local)
+                        .unwrap()
+                        .timestamp_millis() as u64,
+                        settings.settings.read().segment_height,
+                        settings.settings.read().selected_segment_height);
+
+                    let time = convert_ts_to_local_date(current_time() as u64).format("%H:%M:%S").to_string();
+                    
+                    rsx! {
+                        div {
+                            class: "absolute left-0 z-60 w-full flex items-center",
+                            style: format!("top: {}px; transform: translateY(-50%);", y),
+
+                            div {
+                                class: "text-xs bg-primary rounded-r-md px-1 py-0.5 text-foreground shrink-0",
+                                "{time}"
+                            }
+
+                            div {
+                                class: "h-[2px] flex-1 bg-primary/80 rounded-md"
+                            }
+                        }
+                    }
+                } else {
+                    rsx! {
+                        ""
                     }
                 }
             }
@@ -576,7 +692,7 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                         let is_selected = selected_hour()
                             .map(|h| h >= start_hour && h <= end_hour)
                             .unwrap_or(false) && hour_count == 1;
-                        let height = if is_selected { 800.0 } else { 80.0 };
+                        let height = if is_selected { settings.settings.read().selected_segment_height as f32 } else { settings.settings.read().segment_height as f32 };
                         let start_ts = props
                             .day
                             .read()
@@ -623,6 +739,11 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
 
                         });
 
+                        let is_current_hour = {
+                            let now = Local::now().hour();
+                            now >= start_hour && now <= end_hour
+                        };
+
                         rsx! {
                             div {
                                 key: "{start_hour}-{end_hour}", 
@@ -652,14 +773,17 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                             evt.stop_propagation();
                                             let current_hour = selected_hour();
                                             if current_hour.is_some() {
-                                                selected_hour.set(None);
+                                                if current_hour.unwrap() == start_hour {
+                                                    selected_hour.set(None);
+                                                } else {
+                                                    selected_hour.set(Some(start_hour));
+                                                }
                                             } else {
                                                 selected_hour.set(Some(start_hour));
                                             }
                                         },
-                                        class: format!("absolute z-1 left-{} top-1 text-xs opacity-60 select-none flex gap-1 cursor-pointer", 
-                                        if is_selected { "2" } else { "1" }), 
-                                        "{start_hour}:00",
+                                        class: format!("absolute z-1 left-{} top-1 text-xs opacity-60 select-none flex gap-1 cursor-pointer",                                         if is_selected { "2" } else { "1" }), 
+                                        "{start_hour}:00 ",
                                         if is_selected {
                                             button {
                                                 Icon { icon: LdArrowUpToLine, height: 10, width: 10 }
@@ -676,17 +800,57 @@ pub fn EventsTimelineView(props: EventsCalendarProps) -> Element {
                                     class: "flex justify-evenly absolute top-0 left-0 h-full w-full z-0",
                                     {(0..5).map(|i| {
                                         rsx! {
-                                            div { class: "h-full w-[1px] border-dashed border-border/10 border-l-[1px]" }
+                                            div { class: "h-full w-[1px] border-dashed border-border/10 border-l-[1px] " }
                                         }
                                     })}
                                 }
                                 if is_selected {
-                                    {(1..6).map(|i| {
+                                    {(1..4).map(|i| {
                                         rsx! {
-                                            div { class: "absolute left-2 z-40 text-xs opacity-60 pointer-events-none select-none z-1", style: format!("top: calc(100%/6*{})", i), {format!("{}:{}",start_hour, 60 / 6 * i)} }
+                                            div { class: "absolute left-2 z-40 text-xs opacity-60 pointer-events-none select-none z-1 -translate-y-1/2", style: format!("top: calc(100%/4*{})", i), {format!("{}:{}",start_hour, 60 / 4 * i)} }
                                         }
                                     })}
                                 }
+
+                                if is_selected {
+                                    {(1..12).map(|i| {
+                                        let minute = i * 5;
+
+                                        let width = if minute % 15 == 0 {
+                                            4
+                                        } else if minute % 10 == 0 {
+                                            3
+                                        } else {
+                                            2
+                                        };
+
+                                        rsx! {
+                                            div {
+                                                class: "absolute left-1 z-40 h-[1px] bg-border",
+                                                style: format!(
+                                                    "top: calc(100% / 12 * {}); width: {}px; left: {}px",
+                                                    i,
+                                                    width,
+                                                    if is_current_hour { 4 } else { 0 }
+                                                ),
+                                            }
+                                        }
+                                    })}
+                                } else {
+                                    {(1..4).map(|i| {
+                                        rsx! {
+                                            div {
+                                                class: "absolute left-0 z-40 h-[1px] bg-border",
+                                                style: format!(
+                                                    "top: calc(100% / 4 * {}); width: 2px; left: {}px",
+                                                    i,
+                                                    if is_current_hour { 4 } else { 0 }
+                                                ),
+                                            }
+                                        }
+                                    })}
+                                }
+
                             }
                         }
                     })

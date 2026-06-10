@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     core::TagModel,
-    ui::ColorPicker,
+    ui::color_picker::ColorPicker,
 };
 
 #[derive(Props, PartialEq, Clone)]

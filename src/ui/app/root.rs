@@ -2,11 +2,10 @@ use chrono::Local;
 use dioxus::prelude::*;
 
 use crate::{
-    core::with_database,
+    core::{tag_repo::auto_tag, with_database},
     lib::convert_ts_to_local_date,
     ui::{
-        provide_alert, provide_app, provide_db, provide_event_bus, provide_settings, provide_toast,
-        use_app, use_event_bus, INITIAL_EVENT_LIMIT, Layout, MAX_EVENTS_IN_MEMORY, Router, Tray,
+        INITIAL_EVENT_LIMIT, Layout, MAX_EVENTS_IN_MEMORY, Router, Tray, db, provide_alert, provide_app, provide_db, provide_event_bus, provide_settings, provide_toast, use_app, use_event_bus
     },
 };
 
@@ -143,7 +142,11 @@ pub fn Root() -> Element {
                     .unwrap();
 
                     match recv_result {
-                        Ok(event) => {
+                        Ok(event) => { 
+                            let event = with_database(|db| {
+                                db.auto_tag(event)
+                            }).expect("Failed auto tag event");
+
                             let selected_day = day.read().date_naive();
                             let event_day =
                                 convert_ts_to_local_date(event.timestamp).date_naive();

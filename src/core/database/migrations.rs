@@ -139,6 +139,7 @@ fn apply_v1_initial_schema(conn: &Connection) -> Result<()> {
             tag_id INTEGER NOT NULL,
             process_name TEXT NOT NULL,
             FOREIGN KEY(tag_id) REFERENCES tag(id)
+            UNIQUE(tag_id, process_name)
         );
 
         CREATE INDEX IF NOT EXISTS idx_window_time
