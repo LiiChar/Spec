@@ -1,6 +1,5 @@
-use chrono::format;
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::{LdChevronDown, LdChevronUp};
+use dioxus_free_icons::icons::ld_icons::{LdChevronUp};
 use dioxus_free_icons::Icon;
 
 #[derive(Clone)]

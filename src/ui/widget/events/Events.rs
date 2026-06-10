@@ -5,7 +5,7 @@ use dioxus::prelude::*;
 use crate::{
     lib::format_duration_short,
     ui::{
-        AppVariant, EventsStats, EventsTimelineView, Select, SelectContent, SelectItem, SelectTrigger, Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant, TimelineOrientation, use_app
+        AppVariant, EventsStats, EventsTimelineView, select::{Select, SelectContent, SelectItem, SelectTrigger}, tabs::{Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant}, TimelineOrientation, use_app
     },
 };
 

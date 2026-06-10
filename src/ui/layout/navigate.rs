@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::ui::{AppProvider, Page, Tooltip, TooltipAlign, use_app};
+use crate::ui::{AppProvider, Page, tooltip::Tooltip, tooltip::TooltipAlign, use_app};
 use dioxus_free_icons::{
     icons::ld_icons::{LdAreaChart, LdHome, LdMenu, LdSettings, LdX},
     Icon,

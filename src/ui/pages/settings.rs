@@ -4,9 +4,9 @@ use std::{fs, path::PathBuf, rc::Rc};
 
 use crate::{
     core::{
-        EventModel, GoalModel, JobModel, TagModel, app_tag_preset_groups, with_database, with_database_mut
+        EventModel, GoalModel, JobModel, with_database, with_database_mut
     },
-    ui::{Button, ButtonSize, Language, Select, SelectContent, SelectItem, SelectTrigger, Switch, Theme, use_app, use_settings, use_toast, widget::window::window::Windows},
+    ui::{button::Button, Language, select::Select, select::SelectContent, select::SelectItem, select::SelectTrigger, switch::Switch, Theme, use_app, use_settings, use_toast, range::Range},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -258,6 +258,44 @@ pub fn SettingsPage() -> Element {
                             }
                         },
                     }
+
+                    {
+                        let st = settings_rc.clone();
+                        
+                        rsx! {
+                            Range {
+                                label: "Высота часа".to_string(),
+                                value: settings.segment_height,
+                                min: 1,
+                                max: 2000,
+                                step: 1,
+                                on_input: move |v| {
+                                    let mut c = (*st).clone();
+                                    c.set_segment_height(v);
+                                }
+                            }
+                        }
+                    }
+
+                    {
+                        let st = settings_rc.clone();
+                        
+                        rsx! {
+                            Range {
+                                label: "Высота выбранного часа".to_string(),
+                                value: settings.selected_segment_height,
+                                min: 1,
+                                max: 2000,
+                                step: 1,
+                                on_input: move |v| {
+                                    let mut c = (*st).clone();
+                                    c.set_selected_segment_height(v);
+                                }
+                            }
+                        }
+                    }
+
+                    
                 }
             }
 

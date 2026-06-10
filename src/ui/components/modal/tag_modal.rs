@@ -4,7 +4,7 @@ use dioxus_free_icons::Icon;
 
 use crate::{
     core::TagModel,
-    ui::{Button, use_alert, use_toast},
+    ui::{button::Button, use_alert, use_toast},
     ui::tag_form::TagForm,
     ui::use_app,
 };

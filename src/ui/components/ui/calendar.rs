@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 
 use dioxus_free_icons::{icons::ld_icons::LdCalendar, Icon};
 
-use crate::ui::{Button, Input};
+use crate::ui::{button::{Button, ButtonSize, ButtonVariant}, input::Input};
 
 #[derive(Props, PartialEq, Clone)]
 pub struct CalendarProps {

@@ -8,5 +8,5 @@ pub mod tooltip;
 pub mod calendar;
 pub mod dropdown;
 pub mod select;
-pub mod alert;
+pub mod alerter;
 pub mod range;

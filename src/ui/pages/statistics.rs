@@ -8,7 +8,7 @@ use dioxus_free_icons::Icon;
 use crate::{
     core::{EventModel, EventType, GoalModel, JobModel, get_app_uptime, get_boot_time, get_uptime, with_database, with_database_mut},
     lib::{convert_ts_to_local_date, format_duration, format_duration_short},
-    ui::{Button, Calendar, Tooltip, TooltipAlign, goal_form::GoalForm, job_form::JobForm, tag_modal::TagModal, use_app, use_toast, widget::window::window::Windows},
+    ui::{button::Button, calendar::Calendar, tooltip::Tooltip, tooltip::TooltipAlign, goal_form::GoalForm, job_form::JobForm, tag_modal::TagModal, use_app, use_toast, widget::window::window::Windows},
 };
 use chrono::Local;
 

@@ -3,10 +3,9 @@ use dioxus_free_icons::icons::ld_icons::{LdTag, LdTrash};
 use dioxus_free_icons::Icon;
 
 use crate::{
-    core::{with_database, with_database_mut, TagModel, WindowModel},
+    core::{with_database_mut, TagModel, WindowModel},
     ui::{
-        use_app, use_toast, Button, Dropdown, DropdownContent, DropdownItem,
-        DropdownTrigger,
+        use_app, use_toast, button::Button, dropdown::{Dropdown, DropdownContent, DropdownItem, DropdownTrigger}
     },
 };
 

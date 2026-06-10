@@ -4,7 +4,7 @@ use dioxus_free_icons::icons::ld_icons::{LdPencil, LdTrash, LdX};
 use dioxus_free_icons::Icon;
 
 use crate::lib::{event_stats, format_duration_short, get_start_day_ts};
-use crate::ui::{Button, use_alert, use_toast};
+use crate::ui::{button::Button, use_alert, use_toast};
 use crate::{
     core::{EventModel, JobModel, with_database, with_database_mut},
     lib::{convert_ts_to_date, convert_ts_to_local_date},
