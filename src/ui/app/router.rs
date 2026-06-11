@@ -1,4 +1,4 @@
-use crate::ui::{MainPage, SettingsPage, StatisticsPage, use_app};
+use crate::ui::{context::use_app, pages::{MainPage, SettingsPage, StatisticsPage}};
 use dioxus::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

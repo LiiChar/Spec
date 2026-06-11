@@ -9,19 +9,16 @@ use dioxus::{
 use dioxus_free_icons::icons::ld_icons::{LdArrowLeft, LdArrowRight, LdMinus, LdPlus, LdTarget};
 use dioxus_free_icons::Icon;
 
-use crate::ui::{job_form_modal::JobFormModal, use_app, use_toast};
 use crate::{
-    core::{with_database, with_database_mut, JobModel},
-    ui::{EventsCalendar, TimeInput},
+    core::{JobModel, with_database, with_database_mut}, ui::{components::{events::EventsCalendar, modal::job_form_modal::JobFormModal, time::TimeInput}, context::{use_app, use_toast}},
 };
 
 #[component]
 pub fn Header() -> Element {
     let window = use_window();
-
     let mut toast = use_toast();
-
     let mut context = use_app();
+
     let events = context.events;
     let day = context.day;
     let mut time = context.time;

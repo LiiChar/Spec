@@ -4,7 +4,8 @@ use dioxus::{ prelude::*};
 use dioxus_free_icons::{icons::ld_icons::LdX, Icon};
 use tokio::time::sleep;
 
-use crate::ui::{ToastAlign, ToastType, ToasterProvider, use_settings, use_toast};
+use crate::ui::context::{ToastAlign, ToastType, use_settings, use_toast};
+
 
 #[component]
 pub fn Toaster() -> Element {

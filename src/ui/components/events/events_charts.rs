@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{Local, Timelike};
 use dioxus::prelude::*;
 
-use crate::{core::EventModel, ui::use_app};
+use crate::{core::EventModel, ui::context::use_app};
 
 #[derive(PartialEq, Clone)]
 pub enum ChartType {

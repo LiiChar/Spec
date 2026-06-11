@@ -11,5 +11,5 @@ pub use events_calendar::*;
 pub use events_charts::*;
 pub use events_list::*;
 pub use events_stats::*;
-pub use events_timeline::{EventsCalendarProps, EventsTimelineView, TimelineOrientation};
+pub use events_timeline::*;
 pub use events_week::*;

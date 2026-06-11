@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::ui::Events;
+use crate::ui::widget::events::events::Events;
 
 #[component]
 pub fn MainPage() -> Element {

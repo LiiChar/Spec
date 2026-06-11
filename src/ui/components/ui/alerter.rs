@@ -4,7 +4,7 @@ use dioxus::{ prelude::*};
 use dioxus_free_icons::{icons::ld_icons::LdX, Icon};
 use tokio::time::sleep;
 
-use crate::ui::{AlertAlign, AlertType, button::Button, button::ButtonSize, button::ButtonVariant, use_alert, use_settings};
+use crate::ui::{components::ui::button::{Button, ButtonSize, ButtonVariant}, context::{AlertAlign, AlertType, use_alert, use_settings}};
 
 #[component]
 pub fn Alerter() -> Element {

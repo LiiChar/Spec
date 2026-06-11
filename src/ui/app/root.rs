@@ -2,11 +2,8 @@ use chrono::Local;
 use dioxus::prelude::*;
 
 use crate::{
-    core::{tag_repo::auto_tag, with_database},
-    lib::convert_ts_to_local_date,
-    ui::{
-        INITIAL_EVENT_LIMIT, Layout, MAX_EVENTS_IN_MEMORY, Router, Tray, db, provide_alert, provide_app, provide_db, provide_event_bus, provide_settings, provide_toast, use_app, use_event_bus
-    },
+    core::with_database,
+    lib::convert_ts_to_local_date, ui::{app::Router, config::{INITIAL_EVENT_LIMIT, MAX_EVENTS_IN_MEMORY}, context::{provide_alert, provide_app, provide_db, provide_event_bus, provide_settings, provide_toast, use_app, use_event_bus}, layout::Layout, widget::tray::Tray},
 };
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");

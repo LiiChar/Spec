@@ -1,7 +1,8 @@
 use directories::ProjectDirs;
 use std::{fs, path::PathBuf};
 
-use crate::ui::Settings;
+use crate::ui::context::Settings;
+
 
 pub type Result<T> = std::result::Result<T, String>;
 

@@ -3,8 +3,7 @@ use dioxus::prelude::*;
 
 use crate::{
     core::{JobModel, TagModel},
-    lib::convert_ts_to_local_date,
-    ui::{TimeInput, calendar::Calendar, color_picker::ColorPicker, switch::Switch},
+    lib::convert_ts_to_local_date, ui::components::{time::TimeInput, ui::{calendar::Calendar, color_picker::ColorPicker}},
 };
 
 #[derive(Props, PartialEq, Clone)]

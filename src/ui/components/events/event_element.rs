@@ -6,8 +6,7 @@ use palette::{Srgba, WithAlpha};
 
 use crate::{
     core::{EventModel, EventType, JobModel, TagModel, with_database},
-    lib::{CronExpr, color::{foreground_color, icon_bg_color, idle_color, set_alpha, soften_color}, convert_ts_to_local_date, format_duration_short, get_process_color},
-    ui::{TimelineOrientation, tooltip::Tooltip, tooltip::TooltipAlign, app, use_settings},
+    lib::{CronExpr, color::{foreground_color, icon_bg_color, idle_color, set_alpha, soften_color}, convert_ts_to_local_date, format_duration_short, get_process_color}, ui::{components::{events::TimelineOrientation, ui::tooltip::{Tooltip, TooltipAlign}}, context::use_settings},
 };
 
 #[derive(Props, PartialEq, Clone)]
@@ -111,8 +110,6 @@ fn compute_event_lanes(
 #[component]
 pub fn EventElement(props: EventsElementProps) -> Element {
     let settings = use_settings();
-
-
 
     let mut jobs = props.jobs;
     let orientation = props.orientation;
@@ -412,7 +409,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                 key: "{event.timestamp}",
 
                                 class: format!(
-                                    "timeline-event left-1 right-1 absolute group cursor-pointer transition-all overflow-visible rounded-[2px]",
+                                    "timeline-event left-1 right-1 absolute group cursor-pointer transition-all overflow-visible rounded-[2px] z-4",
                                     
                                 ),
 
@@ -463,7 +460,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     target: Some({
                                         rsx! {
                                             div {
-                                                class: "p-2 whitespace-nowrap -ml-1 min-w-[220px]",
+                                                class: "p-2 whitespace-nowrap -ml-1 min-w-[220px]   z-6",
 
                                                 div {
                                                     class: "absolute w-[7px] h-[7px] top-1 right-1 rounded-full",

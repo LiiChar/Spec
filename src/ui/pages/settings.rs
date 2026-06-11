@@ -5,8 +5,7 @@ use std::{fs, path::PathBuf, rc::Rc};
 use crate::{
     core::{
         EventModel, GoalModel, JobModel, with_database, with_database_mut
-    },
-    ui::{button::Button, Language, select::Select, select::SelectContent, select::SelectItem, select::SelectTrigger, switch::Switch, Theme, use_app, use_settings, use_toast, range::Range},
+    }, ui::{components::ui::{button::Button, range::Range, select::{Select, SelectContent, SelectItem, SelectTrigger}, switch::Switch}, context::{Language, Theme, use_app, use_settings, use_toast}},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,10 +1,11 @@
 use dioxus::prelude::*;
 
-use crate::ui::{AppProvider, Page, tooltip::Tooltip, tooltip::TooltipAlign, use_app};
 use dioxus_free_icons::{
     icons::ld_icons::{LdAreaChart, LdHome, LdMenu, LdSettings, LdX},
     Icon,
 };
+
+use crate::ui::{app::Page, components::ui::tooltip::{Tooltip, TooltipAlign}, context::use_app};
 
 #[component]
 pub fn Navigate() -> Element {

@@ -2,11 +2,11 @@ use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{LdX, LdPencil, LdTrash};
 use dioxus_free_icons::Icon;
 
+use crate::ui::components::forms::tag_form::TagForm;
+use crate::ui::components::ui::button::Button;
+use crate::ui::context::{use_alert, use_app, use_toast};
 use crate::{
     core::TagModel,
-    ui::{button::Button, use_alert, use_toast},
-    ui::tag_form::TagForm,
-    ui::use_app,
 };
 
 #[derive(Props, PartialEq, Clone)]

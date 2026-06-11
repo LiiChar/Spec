@@ -3,10 +3,7 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 
 use crate::{
-    lib::format_duration_short,
-    ui::{
-        AppVariant, EventsStats, EventsTimelineView, select::{Select, SelectContent, SelectItem, SelectTrigger}, tabs::{Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant}, TimelineOrientation, use_app
-    },
+    lib::format_duration_short, ui::{components::{events::{EventsStats, EventsTimeline, TimelineOrientation}, ui::tabs::{Tabs, TabsContent, TabsList, TabsTrigger, TabsVariant}}, context::use_app},
 };
 
 #[component]
@@ -55,7 +52,7 @@ pub fn Events() -> Element {
                     //             variant.set(AppVariant::from_str(&value).unwrap_or_default());
                     //         },
                     //         SelectTrigger { class: "py-0.5! h-full text-sm" }
-                    //         SelectContent { 
+                    //         SelectContent {
                     //             SelectItem { class: "py-0.5! text-sm", value: "events".to_string(), title: "События", "События" }
                     //             SelectItem { class: "py-0.5! text-sm", value: "tags".to_string(), title: "Теги", "Теги" }
                     //             SelectItem { class: "py-0.5! text-sm", value: "jobs".to_string(), title: "Задания", "Задания" }
@@ -69,7 +66,7 @@ pub fn Events() -> Element {
                     div { class: "flex-1 flex flex-row gap-3 py-1 pt-2",
 
                         div { class: "flex-1 flex z-50",
-                            EventsTimelineView {
+                            EventsTimeline {
                                 events: events.clone(),
                                 jobs: jobs.clone(),
                                 orientation: TimelineOrientation::Vertical,

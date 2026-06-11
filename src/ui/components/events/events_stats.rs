@@ -4,8 +4,7 @@ use dioxus::prelude::*;
 
 use crate::{
     core::EventType,
-    lib::{convert_ts_to_local_date, format_duration_short},
-    ui::use_app,
+    lib::{convert_ts_to_local_date, format_duration_short}, ui::context::use_app,
 };
 
 #[component]

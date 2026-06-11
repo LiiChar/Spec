@@ -11,6 +11,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::LASTINPUTINFO;
 
 use crate::core::{get_current_window, EventModel, EventType, TagRule, TagRuleField, WindowModel, with_database_mut};
 use crate::lib::{current_ts, load_settings};
+use crate::ui::context::Settings;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Activity {
@@ -38,7 +39,7 @@ pub struct Tracker {
     pub report_interval: Duration,
     pub settings_reload_at: Instant,
     pub rules: Vec<(TagRule, Regex)>,
-    pub settings: crate::ui::Settings,
+    pub settings: Settings,
 }
 
 impl Tracker {

@@ -3,8 +3,7 @@ use dioxus::prelude::*;
 use chrono::{DateTime, Local};
 
 use crate::{
-    core::{EventModel, GoalModel, JobModel, TagModel, with_database, with_database_mut},
-    ui::Page,
+    core::{EventModel, GoalModel, JobModel, TagModel, with_database, with_database_mut}, ui::app::Page,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

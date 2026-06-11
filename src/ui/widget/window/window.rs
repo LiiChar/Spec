@@ -1,8 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    core::with_database,
-    ui::{use_app, window_list::WindowList},
+    core::with_database, ui::{components::window::window_list::WindowList, context::use_app},
 };
 
 #[component]

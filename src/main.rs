@@ -15,7 +15,7 @@ use dioxus::{
 };
 use once_cell::sync::Lazy;
 
-use crate::lib::{Builder, load_icon, load_settings};
+use crate::{lib::{Builder, load_icon, load_settings}, ui::{app::Root, config::DATABASE_PATH}};
 
 static RX: Lazy<Mutex<Option<Receiver<EventModel>>>> = Lazy::new(|| Mutex::new(None));
 static DB: Lazy<Db> = Lazy::new(|| Arc::new(Mutex::new(Database::new(DATABASE_PATH))));
