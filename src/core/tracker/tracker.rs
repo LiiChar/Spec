@@ -171,9 +171,8 @@ pub fn start_tracking(tx: Sender<EventModel>) {
                     window: Some(win),
                     idle,
                 },
-                _ => Activity {
-                    window: None,
-                    idle: true,
+                _ => {
+                    continue;
                 },
             };
 

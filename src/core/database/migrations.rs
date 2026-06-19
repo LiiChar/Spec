@@ -6,7 +6,7 @@ use rusqlite::{Connection, Result};
 use crate::core::app_tag_preset_groups;
 
 /// Current schema version
-pub const SCHEMA_VERSION: u32 = 4;
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// Initialize migrations tracking table and run pending migrations
 pub fn run_migrations(conn: &mut Connection) -> Result<()> {
@@ -52,6 +52,14 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
         apply_v3_add_default_tags(conn)?;
         conn.execute(
             "INSERT INTO schema_version (version, name) VALUES (3, 'add_default_tags')",
+            [],
+        )?;
+    }
+
+    if current_version < 4 {
+        apply_v4_delete_empty_window_events(conn)?;
+        conn.execute(
+            "INSERT INTO schema_version (version, name) VALUES (4, 'add_default_tags')",
             [],
         )?;
     }
@@ -186,6 +194,15 @@ fn apply_v3_add_default_tags(conn: &Connection) -> Result<()> {
             )?;
         }
     }
+
+    Ok(())
+}
+
+fn apply_v4_delete_empty_window_events(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "DELETE FROM events WHERE window_activity_id IS NULL",
+        [],
+    )?;
 
     Ok(())
 }

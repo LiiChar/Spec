@@ -460,7 +460,7 @@ pub fn EventElement(props: EventsElementProps) -> Element {
                                     target: Some({
                                         rsx! {
                                             div {
-                                                class: "p-2 whitespace-nowrap -ml-1 min-w-[220px]   z-6",
+                                                class: "p-2 whitespace-nowrap -ml-1 min-w-[220px]   z-100",
 
                                                 div {
                                                     class: "absolute w-[7px] h-[7px] top-1 right-1 rounded-full",
