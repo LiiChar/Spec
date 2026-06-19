@@ -299,8 +299,6 @@ pub fn EventElement(props: EventsElementProps) -> Element {
             {
                 let mut events = props.events;
 
-                
-
                 // длинные сначала
                 events.sort_by(|a, b| b.duration.cmp(&a.duration));
 
@@ -312,12 +310,22 @@ pub fn EventElement(props: EventsElementProps) -> Element {
 
                 let lane_count = lanes.iter().copied().max().unwrap_or(0) + 1;
 
-                events
+                // Сортируем события по offset (позиции на таймлайне) для правильного z-index stacking.
+                // События ниже на таймлайне (больший offset) рендерятся последними и получают более высокий
+                // приоритет наложения, чтобы их тултипы (TooltipAlign::Top) не перекрывались событиями выше.
+                let mut indexed_events: Vec<(usize, EventModel)> = events.into_iter().enumerate().collect();
+                indexed_events.sort_by(|(ia, a), (ib, b)| {
+                    let (offset_a, _) = event_range_in_segment(a, props.start_hour, props.end_hour);
+                    let (offset_b, _) = event_range_in_segment(b, props.start_hour, props.end_hour);
+                    offset_a.partial_cmp(&offset_b).unwrap_or(std::cmp::Ordering::Equal)
+                });
+
+                let lanes_c = lanes;
+                let lane_count_c = lane_count;
+
+                indexed_events
                     .into_iter()
-                    .enumerate()
                     .map(move |(index, event)| {
-                        let lanes_c = lanes.clone();
-                        let lane_count_c = lane_count;
 
                         let start_dt = convert_ts_to_local_date(event.timestamp);
                         let end_dt =
