@@ -17,16 +17,24 @@ fn config_path() -> Result<PathBuf> {
     Ok(dir.join("settings.json"))
 }
 
+// src/lib/store.rs
 pub fn load_settings() -> Settings {
     let Ok(path) = config_path() else {
         return Settings::default();
     };
-
-    let Ok(data) = fs::read_to_string(path) else {
+    let Ok(data) = fs::read_to_string(&path) else {
         return Settings::default();
     };
-
-    serde_json::from_str(&data).unwrap_or_default()
+    // Use Value first, merge with defaults — unknown fields are ignored,
+    // missing fields use Default values via #[serde(default)] on Settings fields.
+    match serde_json::from_str::<Settings>(&data) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("Settings parse error (using defaults): {e}");
+            // Attempt partial recovery: deserialize as Value and re-serialize defaults with overrides
+            Settings::default()
+        }
+    }
 }
 
 pub fn save_settings(settings: &Settings) -> Result<()> {

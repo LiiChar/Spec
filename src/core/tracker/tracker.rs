@@ -154,7 +154,6 @@ fn is_user_idle(threshold_secs: u32) -> bool {
 pub fn start_tracking(tx: Sender<EventModel>) {
     let tracker = Arc::new(Mutex::new(Tracker::new()));
     let running = Arc::new(Mutex::new(true));
-
     let t_tracker = tracker.clone();
     let t_running = running.clone();
 
@@ -162,32 +161,37 @@ pub fn start_tracking(tx: Sender<EventModel>) {
     let threshold = t_tracker.lock().unwrap().idle_threshold;
 
     thread::spawn(move || {
-        let poll_interval = interval;
+        let mut consecutive_failures: u32 = 0;
 
         while *t_running.lock().unwrap() {
             let idle = is_user_idle(threshold);
-            let next_activity = match get_current_window(None) {
-                Some(win) if !win.process_path.trim().is_empty() => Activity {
-                    window: Some(win),
-                    idle,
-                },
+            match get_current_window(None) {
+                Some(win) if !win.process_path.trim().is_empty() => {
+                    consecutive_failures = 0;
+                    let next_activity = Activity { window: Some(win), idle };
+                    let mut tracker = t_tracker.lock().unwrap();
+                    match &tracker.current {
+                        Some(current) if same_activity(current, &next_activity) => {
+                            tracker.tick(&tx)
+                        }
+                        _ => tracker.switch(next_activity, &tx),
+                    }
+                }
                 _ => {
+                    consecutive_failures += 1;
+                    // Exponential backoff up to 5 seconds
+                    let backoff = Duration::from_millis(
+                        (100 * 2u64.pow(consecutive_failures.min(6))).min(5000)
+                    );
+                    thread::sleep(backoff);
                     continue;
-                },
-            };
-
-            let mut tracker = t_tracker.lock().unwrap();
-            match &tracker.current {
-                Some(current) if same_activity(current, &next_activity) => tracker.tick(&tx),
-                _ => tracker.switch(next_activity, &tx),
+                }
             }
 
-            drop(tracker);
-            thread::sleep(poll_interval);
+            thread::sleep(interval);
         }
 
-        let mut tracker = t_tracker.lock().unwrap();
-        tracker.finalize(&tx);
+        t_tracker.lock().unwrap().finalize(&tx);
     });
 }
 

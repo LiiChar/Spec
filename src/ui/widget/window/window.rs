@@ -7,16 +7,23 @@ use crate::{
 #[component]
 pub fn Windows() -> Element {
     let app = use_app();
+    let mut windows = use_signal(Vec::new);
 
-    let _events = app.events.read();
-
-    let windows = with_database(|db| {
-        db.get_windows().unwrap_or_default()
+    // Trigger reload when events change (i.e., new data arrived)
+    let events_len = app.events.read().len();
+    use_effect(move || {
+        let _ = events_len; // depend on events length
+        spawn(async move {
+            let result = tokio::task::spawn_blocking(|| {
+                with_database(|db| db.get_windows().unwrap_or_default())
+            }).await;
+            if let Ok(w) = result {
+                windows.set(w);
+            }
+        });
     });
 
     rsx! {
-        WindowList {
-            windows
-        }
+        WindowList { windows: windows() }
     }
 }

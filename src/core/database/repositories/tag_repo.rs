@@ -66,7 +66,6 @@ impl TagRepository {
         }
     }
 
-    /// Create or get existing tag (idempotent)
     pub fn ensure(conn: &Connection, name: &str, color: &str, filter: Option<String>) -> Result<TagModel> {
         if let Some(tag) = Self::get_by_name(conn, name)? {
             return Ok(tag);
@@ -74,14 +73,13 @@ impl TagRepository {
 
         conn.execute(
             &format!(
-                "INSERT INTO {} ({}, {}, {}, {}) VALUES (?1, NULL, ?2)",
+                "INSERT INTO {} ({}, {}, {}) VALUES (?1, ?2, ?3)",
                 tag_schema::TABLE,
                 tag_schema::COL_NAME,
-                tag_schema::COL_DESCRIPTION,
                 tag_schema::COL_COLOR,
                 tag_schema::COL_FILTER
             ),
-            (name, color, filter.clone()),
+            rusqlite::params![name, color, filter.clone()],
         )?;
 
         Ok(TagModel {

@@ -199,7 +199,7 @@ pub fn Tooltip(props: TooltipProps) -> Element {
                 div {
                     role: "tooltip",
                     id: id(),
-                    class: "absolute pointer-events-none whitespace-nowrap tooltip rounded-md border border-border/40 bg-secondary/70 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class}",
+                    class: "absolute pointer-events-none whitespace-nowrap tooltip rounded-md border max-w-[90%] border-border/40 bg-secondary/70 px-2 py-1 text-xs text-foreground shadow-sm backdrop-blur-md {position_class}",
 
                     style: match props.at_cursor {
                         true => {

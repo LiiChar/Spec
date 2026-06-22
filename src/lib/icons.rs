@@ -106,29 +106,29 @@ fn default_icon_data_uri() -> Option<String> {
     None
 }
 
+// src/lib/icons.rs
 pub fn get_primary_icon_color(icon: String, process_name: String) -> String {
-    // Удаляем префикс data:image/...;base64, если есть
     let base64_data = if icon.contains(";base64,") {
-        icon.split(";base64,").nth(1).unwrap_or(&icon)
+        icon.split(";base64,").nth(1).unwrap_or(&icon).to_string()
     } else {
-        &icon
+        icon.clone()
     };
 
-    // Декодируем base64
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(base64_data)
-        .expect("Failed to decode base64");
+    let color_from_icon = (|| -> Option<String> {
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(&base64_data)
+            .ok()?;
+        let img = image::load_from_memory(&decoded).ok()?;
+        let rgba = img.to_rgba8();
+        let raw_pixels = rgba.as_raw();
+        let colors = color_thief::get_palette(raw_pixels, ColorFormat::Rgba, 6, 10).ok()?;
+        colors.first().map(|v| v.to_string())
+    })();
 
-    let img = image::load_from_memory(&decoded).expect("Invalid image");
-    let rgba = img.to_rgba8();
-    let raw_pixels = rgba.as_raw();
-    let colors = color_thief::get_palette(raw_pixels, ColorFormat::Rgba, 6, 10).expect("Failed get palette fron icon");
-
-    colors.first().map(|v| v.to_string()).unwrap_or_else(|| get_process_color(&process_name).to_string()).to_string()
+    color_from_icon.unwrap_or_else(|| get_process_color(&process_name).to_string())
 }
-/// Извлечь иконку из приложения
+
 fn extract_app_icon(process_name: &str) -> Option<String> {
-    // Обычные расположения приложений
     let possible_paths = vec![
         format!("C:\\Program Files\\{}\\{}.exe", process_name, process_name),
         format!(

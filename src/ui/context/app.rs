@@ -195,21 +195,17 @@ impl AppProvider {
         let mut ctx_tag: Signal<Vec<TagModel>> = self.tags;
         spawn(async move {
             let result = tokio::task::spawn_blocking(move || {
-                with_database_mut(|db| {
-                    db.delete_job(id).map(|_| ())
-                })
-            })
-            .await;
+                with_database_mut(|db| db.delete_tag(id).map(|_| ())) // was delete_job
+            }).await;
 
             match result {
                 Ok(Ok(_)) => {
                     if let Ok(tags) = with_database(|db| db.get_tags()) {
-                       ctx_tag.set(tags);
+                        ctx_tag.set(tags);
                     }
-                    println!("Deleted tag id: {}", id);
                 }
-                Ok(Err(e)) => println!("DB error: {:?}", e),
-                Err(e) => println!("Task error: {:?}", e),
+                Ok(Err(e)) => eprintln!("DB error deleting tag {id}: {e:?}"),
+                Err(e) => eprintln!("Task error deleting tag {id}: {e:?}"),
             }
         });
     }
