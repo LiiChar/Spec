@@ -103,6 +103,24 @@ pub fn TimelineGrid(mut props:  TimelineGridProps) -> Element {
                     }
                 }
             })}
+        } else if start_hour != end_hour {
+            {(0..end_hour-start_hour+1).map(|i| {
+                let step = end_hour - start_hour + 1;
+                let minute = i * step; 
+                let width = 2;
+                rsx! {
+                    div {
+                        class: "absolute left-0 z-40 h-[1px] bg-border",
+                        style: format!(
+                            "top: calc(100% / {} * {}); width: {}px; left: {}px",
+                            step,
+                            i,
+                            2,
+                            if is_current_hour { 4 } else { 0 }
+                        ),
+                    }
+                }
+            })}
         } else {
             {(1..4).map(|i| {
                 let minute = i * 15; 
